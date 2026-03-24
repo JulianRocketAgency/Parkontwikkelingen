@@ -362,7 +362,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                               <polygon points={pts}
                                 fill={done?'rgba(48,209,88,.22)':active?'rgba(255,159,10,.22)':'rgba(0,113,227,.18)'}
                                 stroke={done?'#30d158':active?'#ff9f0a':'#0071e3'}
-                                strokeWidth={2} />
+                                strokeWidth={Math.max(1, 2/editorZoom)} />
                               <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
                                 fontSize={14} fontWeight="bold" fill="rgba(0,0,0,.7)"
                                 fontFamily="-apple-system,sans-serif">#{k.number}</text>
@@ -376,13 +376,15 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                                 ...currentPts.map(p => `${p.x/100*editorW},${p.y/100*editorH}`),
                                 ...(hoverPx ? [`${hoverPx.x},${hoverPx.y}`] : [])
                               ].join(' ')}
-                              fill="none" stroke="#0071e3" strokeWidth={2} strokeDasharray="5,4" />
+                              fill="none" stroke="#0071e3" strokeWidth={Math.max(1, 2/editorZoom)} strokeDasharray={`${5/editorZoom},${4/editorZoom}`} />
                             {currentPts.map((p, i) => {
                               const px = p.x/100*editorW, py = p.y/100*editorH
+                              const r = Math.max(3, 8/editorZoom)
+                              const rOuter = Math.max(6, 18/editorZoom)
                               return (
                                 <g key={i}>
-                                  {i === 0 && <circle cx={px} cy={py} r={14} fill="none" stroke="rgba(0,113,227,.35)" strokeWidth={1.5} />}
-                                  <circle cx={px} cy={py} r={i===0?6:4} fill={i===0?'#fff':'#0071e3'} stroke="#0071e3" strokeWidth={2} />
+                                  {i === 0 && <circle cx={px} cy={py} r={rOuter} fill="none" stroke="rgba(0,113,227,.35)" strokeWidth={Math.max(1, 1.5/editorZoom)} />}
+                                  <circle cx={px} cy={py} r={r} fill={i===0?'#fff':'#0071e3'} stroke="#0071e3" strokeWidth={Math.max(1, 2/editorZoom)} />
                                 </g>
                               )
                             })}

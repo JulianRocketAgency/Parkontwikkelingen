@@ -15,17 +15,20 @@ const PARK_ID = '11111111-0000-0000-0000-000000000001'
 // Render PDF page to image data URL using pdf.js
 async function pdfToImageUrl(file: File): Promise<string> {
   const pdfjsLib = await import('pdfjs-dist')
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
   const arrayBuffer = await file.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
   const page = await pdf.getPage(1)
-  const scale = 3 // high resolution
+  const scale = 3
   const viewport = page.getViewport({ scale })
   const canvas = document.createElement('canvas')
   canvas.width = viewport.width
   canvas.height = viewport.height
+  document.body.appendChild(canvas)
   await page.render({ canvas, canvasContext: canvas.getContext('2d')!, viewport }).promise
-  return canvas.toDataURL('image/png')
+  const url = canvas.toDataURL('image/png')
+  document.body.removeChild(canvas)
+  return url
 }
 
 export function InstellingenClient({ park, kavels: initial }: Props) {
@@ -172,10 +175,8 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
       }
 
       url = await upsertParkMap(PARK_ID, fase, uploadFile)
-      setParkMaps(prev => {
-        const filtered = prev.filter(m => m.fase !== fase)
-        return [...filtered, { id: Date.now().toString(), park_id: PARK_ID, fase, map_url: url }]
-      })
+      const freshMaps = await getParkMaps(PARK_ID)
+      setParkMaps(freshMaps)
       loadMapIntoEditor(url, fase)
       setToast('Plattegrond geüpload ✓')
     } catch (err) {

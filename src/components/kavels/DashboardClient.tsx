@@ -106,11 +106,13 @@ export function DashboardClient({ park, kavels: initial }: Props) {
             <PhaseBlock key={fase} fase={fase}
               kavels={kavels.filter(k => k.fase === fase)}
               selectedId={selectedId} onSelect={selectKavel}
-              mapUrl={parkMaps.find(m => m.fase === fase)?.map_url ?? null} />
+              mapUrl={parkMaps.find(m => m.fase === fase)?.map_url ?? null}
+              mapId={parkMaps.find(m => m.fase === fase)?.id ?? null} />
           ))}
         </div>
         <div className="sticky top-7">
           <MapWidget park={park} kavels={kavels} highlightId={selectedId}
+            mapId={parkMaps.find(m => m.fase === null)?.id ?? null}
             onKavelClick={(id) => { setSelectedId(id); setPanelOpen(true) }} />
         </div>
       </div>

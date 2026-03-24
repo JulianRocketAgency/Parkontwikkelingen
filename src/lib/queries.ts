@@ -234,3 +234,37 @@ export async function deleteParkMap(id: string): Promise<void> {
   const { error } = await supabase.from('park_maps').delete().eq('id', id)
   if (error) throw error
 }
+
+// ── Kavel polygons per map ────────────────────────────────────
+export interface KavelPolygon {
+  id: string
+  kavel_id: string
+  map_id: string
+  polygon: { x: number; y: number }[]
+}
+
+export async function getPolygonsForMap(mapId: string): Promise<KavelPolygon[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('kavel_polygons')
+    .select('*')
+    .eq('map_id', mapId)
+  if (error) { console.error('getPolygonsForMap:', error); return [] }
+  return data ?? []
+}
+
+export async function upsertKavelPolygonForMap(
+  kavelId: string,
+  mapId: string,
+  polygon: { x: number; y: number }[] | null
+): Promise<void> {
+  const supabase = createClient()
+  if (!polygon) {
+    await supabase.from('kavel_polygons').delete()
+      .eq('kavel_id', kavelId).eq('map_id', mapId)
+    return
+  }
+  const { error } = await supabase.from('kavel_polygons')
+    .upsert({ kavel_id: kavelId, map_id: mapId, polygon }, { onConflict: 'kavel_id,map_id' })
+  if (error) throw error
+}

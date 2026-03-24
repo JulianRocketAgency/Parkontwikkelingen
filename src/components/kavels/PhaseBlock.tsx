@@ -11,9 +11,10 @@ interface Props {
   selectedId: string | null
   onSelect: (id: string) => void
   mapUrl: string | null
+  mapId?: string | null
 }
 
-export function PhaseBlock({ fase, kavels, selectedId, onSelect, mapUrl }: Props) {
+export function PhaseBlock({ fase, kavels, selectedId, onSelect, mapUrl, mapId }: Props) {
   const [open, setOpen] = useState(fase === 1)
 
   const pct = Math.round(kavels.reduce((s, k) => s + getKavelPct(k.status), 0) / kavels.length)
@@ -62,6 +63,7 @@ export function PhaseBlock({ fase, kavels, selectedId, onSelect, mapUrl }: Props
                 highlightId={selectedId}
                 onKavelClick={onSelect}
                 mapUrl={mapUrl}
+                mapId={mapId}
                 title={`Plattegrond fase ${fase}`}
               />
             </div>

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Kavel, Park } from '@/types'
 import { isOpgeleverd, isActief } from '@/types'
+import { getPolygonsForMap, type KavelPolygon, getParkMaps } from '@/lib/queries'
 import Link from 'next/link'
 
 interface Props {
@@ -9,7 +10,8 @@ interface Props {
   kavels: Kavel[]
   highlightId: string | null
   onKavelClick: (id: string) => void
-  mapUrl?: string | null  // override for fase-specific map
+  mapUrl?: string | null
+  mapId?: string | null
   title?: string
 }
 
@@ -36,16 +38,23 @@ function useMapImage(url: string | null | undefined) {
   return { img, dims, boxRef }
 }
 
-export function MapWidget({ park, kavels, highlightId, onKavelClick, mapUrl, title = 'Plattegrond' }: Props) {
+export function MapWidget({ park, kavels, highlightId, onKavelClick, mapUrl, mapId, title = 'Plattegrond' }: Props) {
   const url = mapUrl ?? park?.map_image
   const { img, dims, boxRef } = useMapImage(url)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [polygons, setPolygons] = useState<KavelPolygon[]>([])
   const dragging = useRef(false)
   const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 })
 
   // Reset zoom/pan when map changes
   useEffect(() => { setZoom(1); setPan({ x: 0, y: 0 }) }, [url])
+
+  // Load polygons for this specific map
+  useEffect(() => {
+    if (mapId) getPolygonsForMap(mapId).then(setPolygons)
+    else setPolygons([])
+  }, [mapId])
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
@@ -67,7 +76,10 @@ export function MapWidget({ park, kavels, highlightId, onKavelClick, mapUrl, tit
 
   const onMouseUp = useCallback(() => { dragging.current = false }, [])
 
-  const withPolygon = kavels.filter(k => k.polygon && k.polygon.length >= 3)
+  // Use map-specific polygons if available, otherwise fall back to kavel.polygon
+  const withPolygon = mapId
+    ? polygons.filter(mp => mp.polygon.length >= 3).map(mp => ({ ...kavels.find(k => k.id === mp.kavel_id)!, _poly: mp.polygon }))
+    : kavels.filter(k => k.polygon && k.polygon.length >= 3).map(k => ({ ...k, _poly: k.polygon! }))
 
   return (
     <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] overflow-hidden">

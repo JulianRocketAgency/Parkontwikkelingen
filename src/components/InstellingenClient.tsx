@@ -4,8 +4,9 @@ import type { Park, Kavel } from '@/types'
 import { isOpgeleverd, isActief, OPTIES, STATUS_LABELS } from '@/types'
 import {
   getParkMaps, upsertParkMap, deleteParkMap,
-  updateKavelPolygon, getDependencies, createDependency, deleteDependency,
-  updatePark, type Dependency, type ParkMap
+  getDependencies, createDependency, deleteDependency,
+  updatePark, getPolygonsForMap, upsertKavelPolygonForMap,
+  type Dependency, type ParkMap, type KavelPolygon
 } from '@/lib/queries'
 
 interface Props { park: Park | null; kavels: Kavel[] }
@@ -46,6 +47,8 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
   const [editorZoom, setEditorZoom] = useState(1)
   const [toast, setToast] = useState('')
   const [deps, setDeps] = useState<Dependency[]>([])
+  const [mapPolygons, setMapPolygons] = useState<KavelPolygon[]>([])
+  const [currentMapId, setCurrentMapId] = useState<string | null>(null)
   const [parkMaps, setParkMaps] = useState<ParkMap[]>([])
   const [newOO, setNewOO] = useState({ trigger: '', requires: '' })
   const [newSO, setNewSO] = useState({ trigger: '', requires: '' })
@@ -72,14 +75,19 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
   }
 
   // Load selected map into editor canvas
-  function loadMapIntoEditor(url: string, fase: number | null) {
+  function loadMapIntoEditor(url: string, fase: number | null, mapId?: string) {
     setEditingFase(fase)
     setEditingId(null)
     setCurrentPts([])
+    setEditorZoom(1)
     imgRef.current = null
     setEditorW(1)
     setEditorH(1)
-    setEditorZoom(1)
+    setMapPolygons([])
+    if (mapId) {
+      setCurrentMapId(mapId)
+      getPolygonsForMap(mapId).then(setMapPolygons)
+    }
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
@@ -88,7 +96,6 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
       const h = img.naturalHeight
       setEditorW(w)
       setEditorH(h)
-      // Calculate zoom to fit in 900x520
       const fitZoom = Math.min(900 / w, 520 / h, 1)
       setEditorZoom(Math.round(fitZoom * 100) / 100)
     }
@@ -152,18 +159,23 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
   }
 
   async function closePoly() {
-    if (!editingId) return
+    if (!editingId || !currentMapId) return
     const polygon = currentPts.slice()
-    await updateKavelPolygon(editingId, polygon)
-    setKavels(prev => prev.map(k => k.id === editingId ? { ...k, polygon } : k))
+    await upsertKavelPolygonForMap(editingId, currentMapId, polygon)
+    setMapPolygons(prev => {
+      const filtered = prev.filter(p => !(p.kavel_id === editingId && p.map_id === currentMapId))
+      return [...filtered, { id: Date.now().toString(), kavel_id: editingId, map_id: currentMapId, polygon }]
+    })
     setCurrentPts([]); setHoverPx(null); setEditingId(null)
     setToast('Kavel opgeslagen ✓')
-    redraw()
   }
 
   function startEdit(id: string) {
     setEditingId(id); setCurrentPts([]); setHoverPx(null)
-    setKavels(prev => prev.map(k => k.id === id ? { ...k, polygon: null } : k))
+    // Remove existing polygon for this map so user can redraw
+    if (currentMapId) {
+      setMapPolygons(prev => prev.filter(p => !(p.kavel_id === id && p.map_id === currentMapId)))
+    }
   }
 
   async function handleMapUpload(fase: number | null, e: React.ChangeEvent<HTMLInputElement>) {
@@ -187,8 +199,8 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
       const freshMaps = await getParkMaps(PARK_ID)
       setParkMaps(freshMaps)
       // Cache buster zodat de nieuwe afbeelding geladen wordt
-      const cacheBustedUrl = url + '?t=' + Date.now()
-      loadMapIntoEditor(cacheBustedUrl, fase)
+      const uploaded = freshMaps.find(m => m.fase === fase)
+      if (uploaded) loadMapIntoEditor(uploaded.map_url + '?t=' + Date.now(), fase, uploaded.id)
       setToast('Plattegrond geüpload ✓')
     } catch (err) {
       console.error(err)
@@ -351,14 +363,15 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                           })
                         }}
                       >
-                        {faseKavelsForEditor.map(k => {
-                          if (!k.polygon || k.polygon.length < 3) return null
+                        {mapPolygons.map(mp => {
+                          const k = kavels.find(k => k.id === mp.kavel_id)
+                          if (!k || mp.polygon.length < 3) return null
                           const done = isOpgeleverd(k), active = isActief(k)
-                          const pts = k.polygon.map(p => `${p.x/100*editorW},${p.y/100*editorH}`).join(' ')
-                          const cx = k.polygon.reduce((s,p)=>s+p.x,0)/k.polygon.length/100*editorW
-                          const cy = k.polygon.reduce((s,p)=>s+p.y,0)/k.polygon.length/100*editorH
+                          const pts = mp.polygon.map(p => `${p.x/100*editorW},${p.y/100*editorH}`).join(' ')
+                          const cx = mp.polygon.reduce((s,p)=>s+p.x,0)/mp.polygon.length/100*editorW
+                          const cy = mp.polygon.reduce((s,p)=>s+p.y,0)/mp.polygon.length/100*editorH
                           return (
-                            <g key={k.id}>
+                            <g key={mp.id}>
                               <polygon points={pts}
                                 fill={done?'rgba(48,209,88,.22)':active?'rgba(255,159,10,.22)':'rgba(0,113,227,.18)'}
                                 stroke={done?'#30d158':active?'#ff9f0a':'#0071e3'}
@@ -398,7 +411,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                     <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-2">Kavels — klik om gebied te tekenen</div>
                     <div className="flex flex-wrap gap-1.5">
                       {faseKavelsForEditor.map(k => {
-                        const hasPoly = k.polygon && k.polygon.length >= 3
+                        const hasPoly = mapPolygons.some(mp => mp.kavel_id === k.id && mp.polygon.length >= 3)
                         const isEd = editingId === k.id
                         return (
                           <div key={k.id} onClick={() => startEdit(k.id)}

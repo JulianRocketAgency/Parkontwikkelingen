@@ -37,16 +37,32 @@ export function EigenarenClient({ owners, kavels }: Props) {
     if (toast) { const t = setTimeout(() => setToast(''), 2200); return () => clearTimeout(t) }
   }, [toast])
 
-  // Betaling summary per owner — always out of 7 termijnen
   const TOTAL_TERMIJNEN = 7
+  // Termijn volgorde voor sortering
+  const TERMIJN_VOLGORDE = [
+    'eerste_termijn','doorgang_fase','bouw_gestart','transport',
+    'geplaatst','gereed_oplevering','opgeleverd'
+  ]
+
   const ownerBetalingSummary = useMemo(() => {
-    const map: Record<string, { triggered: number; voldaan: number; actief: number }> = {}
+    const map: Record<string, { current: number; currentNaam: string; currentKey: string }> = {}
     owners.forEach(o => {
       const bs = betalingen.filter(b => b.owner_id === o.id)
+      if (bs.length === 0) {
+        map[o.id] = { current: 0, currentNaam: '', currentKey: '' }
+        return
+      }
+      // Find highest termijn by volgorde
+      let maxIdx = -1
+      let maxB = bs[0]
+      bs.forEach(b => {
+        const idx = TERMIJN_VOLGORDE.indexOf(b.termijn_key)
+        if (idx > maxIdx) { maxIdx = idx; maxB = b }
+      })
       map[o.id] = {
-        triggered: bs.length,
-        voldaan: bs.filter(b => b.status === 'voldaan').length,
-        actief: bs.filter(b => b.status === 'actief').length,
+        current: maxIdx + 1,
+        currentNaam: maxB.naam,
+        currentKey: maxB.termijn_key,
       }
     })
     return map
@@ -74,11 +90,8 @@ export function EigenarenClient({ owners, kavels }: Props) {
     if (filterBetaling) {
       list = list.filter(o => {
         const s = ownerBetalingSummary[o.id]
-        if (filterBetaling === 'actief') return s?.actief > 0
-        if (filterBetaling === 'voldaan') return s?.triggered > 0 && s?.voldaan === s?.triggered
-        if (filterBetaling === 'geen') return s?.triggered === 0
-        if (filterBetaling === 'gestart') return s?.triggered > 0
-        return true
+        if (filterBetaling === 'geen') return s?.current === 0
+        return s?.currentKey === filterBetaling
       })
     }
     return list
@@ -137,10 +150,14 @@ export function EigenarenClient({ owners, kavels }: Props) {
             <select value={filterBetaling} onChange={e => setFilterBetaling(e.target.value)}
               className="bg-white border border-black/[0.05] rounded-full px-4 py-2.5 text-[13px] outline-none shadow-[0_1px_3px_rgba(0,0,0,0.07)] text-[#3a3a3c]">
               <option value="">Alle termijnen</option>
-              <option value="gestart">Termijnen gestart</option>
-              <option value="actief">Openstaande termijn</option>
-              <option value="voldaan">Alles voldaan</option>
               <option value="geen">Geen termijnen</option>
+              <option value="eerste_termijn">Eerste termijn</option>
+              <option value="doorgang_fase">Doorgang fase</option>
+              <option value="bouw_gestart">Bouw woning gestart</option>
+              <option value="transport">Transport klaarstaan</option>
+              <option value="geplaatst">Geplaatst op kavel</option>
+              <option value="gereed_oplevering">Gereed voor oplevering</option>
+              <option value="opgeleverd">Opgeleverd</option>
             </select>
           </div>
 
@@ -184,14 +201,13 @@ export function EigenarenClient({ owners, kavels }: Props) {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {bSum ? (
-                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full
-                            ${bSum.actief > 0 ? 'bg-[rgba(255,159,10,0.12)] text-[#a05a00]'
-                            : bSum.triggered > 0 ? 'bg-[rgba(48,209,88,0.13)] text-[#1a7a32]'
-                            : 'bg-black/[0.06] text-[#aeaeb2]'}`}>
-                            {bSum.voldaan}/{TOTAL_TERMIJNEN} voldaan
+                        {bSum && bSum.current > 0 ? (
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">
+                            {bSum.current}/{TOTAL_TERMIJNEN} · {bSum.currentNaam}
                           </span>
-                        ) : <span className="text-[11px] text-[#aeaeb2]">0/{TOTAL_TERMIJNEN}</span>}
+                        ) : (
+                          <span className="text-[11px] text-[#aeaeb2]">0/{TOTAL_TERMIJNEN}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right text-[#aeaeb2] text-[12px]">→</td>
                     </tr>
@@ -277,16 +293,12 @@ export function EigenarenClient({ owners, kavels }: Props) {
                 {selectedBetalingen.length > 0 && (
                   <div className="mt-3 p-3 bg-[#f5f5f7] rounded-[10px] border border-black/[0.05]">
                     <div className="flex justify-between text-[12px] mb-1">
-                      <span className="text-[#6e6e73]">Voortgang</span>
-                      <span className="font-medium">{selectedBetalingen.length}/{TOTAL_TERMIJNEN} termijnen</span>
-                    </div>
-                    <div className="flex justify-between text-[12px] mb-1">
-                      <span className="text-[#6e6e73]">Voldaan</span>
-                      <span className="text-[#1a7a32] font-medium">{selectedBetalingen.filter(b=>b.status==='voldaan').length}</span>
+                      <span className="text-[#6e6e73]">Huidige termijn</span>
+                      <span className="font-medium">{selectedBetalingen.length}/{TOTAL_TERMIJNEN}</span>
                     </div>
                     <div className="flex justify-between text-[12px]">
-                      <span className="text-[#6e6e73]">Actief / verwacht</span>
-                      <span className="font-medium text-[#a05a00]">{selectedBetalingen.filter(b=>b.status!=='voldaan').length} / {TOTAL_TERMIJNEN - selectedBetalingen.length} nog te komen</span>
+                      <span className="text-[#6e6e73]">Nog te komen</span>
+                      <span className="text-[#6e6e73] font-medium">{TOTAL_TERMIJNEN - selectedBetalingen.length}</span>
                     </div>
                   </div>
                 )}

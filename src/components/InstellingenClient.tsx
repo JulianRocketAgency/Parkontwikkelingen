@@ -2,7 +2,7 @@
 import { useRef, useState, useEffect } from 'react'
 import type { Park, Kavel } from '@/types'
 import { isOpgeleverd, isActief, OPTIES, STATUS_LABELS } from '@/types'
-import { uploadMapImage, updateKavelPolygon, getDependencies, createDependency, deleteDependency, type Dependency } from '@/lib/queries'
+import { uploadMapImage, updateKavelPolygon, getDependencies, createDependency, deleteDependency, updatePark, type Dependency } from '@/lib/queries'
 
 interface Props { park: Park | null; kavels: Kavel[] }
 type Pt = { x: number; y: number }
@@ -22,6 +22,12 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
   const [deps, setDeps] = useState<Dependency[]>([])
   const [newOO, setNewOO] = useState({ trigger: '', requires: '' })
   const [newSO, setNewSO] = useState({ trigger: '', requires: '' })
+  const [parkForm, setParkForm] = useState({
+    name: park?.name ?? '',
+    location: park?.location ?? '',
+    start_date: park?.start_date ?? '',
+    end_date: park?.end_date ?? '',
+  })
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
@@ -29,6 +35,15 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
   useEffect(() => {
     getDependencies(PARK_ID).then(setDeps)
   }, [])
+
+  async function savePark() {
+    try {
+      await updatePark(PARK_ID, parkForm)
+      setToast('Parkgegevens opgeslagen ✓')
+    } catch {
+      setToast('Opslaan mislukt')
+    }
+  }
 
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 2200); return () => clearTimeout(t) } }, [toast])
 
@@ -314,21 +329,29 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
           <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
             <div className="text-[15px] font-semibold mb-1">Parkgegevens</div>
             <div className="text-[13px] text-[#6e6e73] mb-5">Algemene informatie over dit park.</div>
-            {[['Parknaam', park?.name ?? ''], ['Locatie', '']].map(([label, val]) => (
-              <div key={label} className="mb-3">
-                <label className="block text-[12px] font-medium text-[#6e6e73] mb-1.5">{label}</label>
-                <input defaultValue={val} className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
-              </div>
-            ))}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              {[['Startdatum', park?.start_date ?? ''], ['Opleverdatum', park?.end_date ?? '']].map(([label, val]) => (
-                <div key={label}>
-                  <label className="block text-[12px] font-medium text-[#6e6e73] mb-1.5">{label}</label>
-                  <input type="date" defaultValue={val} className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] outline-none focus:border-[#0071e3] transition-all" />
-                </div>
-              ))}
+            <div className="mb-3">
+              <label className="block text-[12px] font-medium text-[#6e6e73] mb-1.5">Parknaam</label>
+              <input value={parkForm.name} onChange={e => setParkForm(p => ({...p, name: e.target.value}))}
+                className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
             </div>
-            <button onClick={() => setToast('Opgeslagen ✓')} className="px-5 py-2 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] transition-all">Opslaan</button>
+            <div className="mb-3">
+              <label className="block text-[12px] font-medium text-[#6e6e73] mb-1.5">Locatie</label>
+              <input value={parkForm.location} onChange={e => setParkForm(p => ({...p, location: e.target.value}))}
+                className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="block text-[12px] font-medium text-[#6e6e73] mb-1.5">Startdatum</label>
+                <input type="date" value={parkForm.start_date} onChange={e => setParkForm(p => ({...p, start_date: e.target.value}))}
+                  className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] outline-none focus:border-[#0071e3] transition-all" />
+              </div>
+              <div>
+                <label className="block text-[12px] font-medium text-[#6e6e73] mb-1.5">Opleverdatum</label>
+                <input type="date" value={parkForm.end_date} onChange={e => setParkForm(p => ({...p, end_date: e.target.value}))}
+                  className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] outline-none focus:border-[#0071e3] transition-all" />
+              </div>
+            </div>
+            <button onClick={savePark} className="px-5 py-2 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] transition-all">Opslaan</button>
           </div>
           <div className="flex flex-col gap-4">
             <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">

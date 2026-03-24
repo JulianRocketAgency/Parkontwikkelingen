@@ -82,22 +82,21 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       imgRef.current = img
-      const wrap = wrapRef.current
-      const maxW = (wrap?.clientWidth || 700)
-      const maxH = 500
+      // Use a fixed large width — canvas will be constrained by CSS
+      const maxW = 900
+      const maxH = 560
       const scale = Math.min(maxW / img.width, maxH / img.height)
       const w = Math.round(img.width * scale)
       const h = Math.round(img.height * scale)
-      // Directly set canvas dimensions and draw
       const c = canvasRef.current
       if (c) {
         c.width = w
         c.height = h
-        c.style.width = w + 'px'
-        c.style.height = h + 'px'
+        // Let CSS scale it to fit the container
+        c.style.width = '100%'
+        c.style.height = 'auto'
         c.getContext('2d')!.drawImage(img, 0, 0, w, h)
       }
-      // Update state for overlays (polygons)
       setEditorW(w)
       setEditorH(h)
     }
@@ -150,12 +149,15 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
   function onCanvasClick(e: React.MouseEvent<HTMLCanvasElement>) {
     if (!editingId) return
     const r = e.currentTarget.getBoundingClientRect()
+    // Use displayed size (CSS) not intrinsic canvas size
+    const displayW = r.width
+    const displayH = r.height
     const px = e.clientX - r.left, py = e.clientY - r.top
     if (currentPts.length >= 3) {
       const fp = currentPts[0]
-      if (Math.hypot(px - fp.x/100*editorW, py - fp.y/100*editorH) < 14) { closePoly(); return }
+      if (Math.hypot(px - fp.x/100*displayW, py - fp.y/100*displayH) < 14) { closePoly(); return }
     }
-    setCurrentPts(prev => [...prev, { x: px/editorW*100, y: py/editorH*100 }])
+    setCurrentPts(prev => [...prev, { x: px/displayW*100, y: py/displayH*100 }])
   }
 
   async function closePoly() {
@@ -336,7 +338,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                   <div className="grid grid-cols-[1fr_160px] gap-3">
                     <div ref={wrapRef} className={`relative bg-[#e8e8ed] rounded-2xl overflow-hidden w-full ${editingId ? 'cursor-crosshair' : 'cursor-default'}`} style={{minHeight: 300}}>
                       <canvas ref={canvasRef} onClick={onCanvasClick}
-                        onMouseMove={e => { if (editingId && currentPts.length > 0) { const r = e.currentTarget.getBoundingClientRect(); setHoverPx({x:e.clientX-r.left,y:e.clientY-r.top}) }}} />
+                        onMouseMove={e => { if (editingId && currentPts.length > 0) { const r = e.currentTarget.getBoundingClientRect(); const scaleX = editorW/r.width; const scaleY = editorH/r.height; setHoverPx({x:(e.clientX-r.left)*scaleX,y:(e.clientY-r.top)*scaleY}) }}} />
                     </div>
                     {/* Kavel list for this fase */}
                     <div className="flex flex-col gap-1 max-h-[440px] overflow-y-auto">

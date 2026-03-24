@@ -83,7 +83,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     img.onload = () => {
       imgRef.current = img
       // Use a fixed large width — canvas will be constrained by CSS
-      const maxW = 900
+      const maxW = wrapRef.current?.clientWidth || 900
       const maxH = 560
       const scale = Math.min(maxW / img.width, maxH / img.height)
       const w = Math.round(img.width * scale)
@@ -336,7 +336,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                     )}
                   </div>
                   <div ref={wrapRef} className={`relative bg-[#e8e8ed] rounded-2xl overflow-hidden w-full ${editingId ? 'cursor-crosshair' : 'cursor-default'}`}>
-                    <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'auto'}} onClick={onCanvasClick}
+                    <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'auto',maxHeight:'560px',objectFit:'contain'}} onClick={onCanvasClick}
                       onMouseMove={e => { if (editingId && currentPts.length > 0) { const r = e.currentTarget.getBoundingClientRect(); const scaleX = editorW/r.width; const scaleY = editorH/r.height; setHoverPx({x:(e.clientX-r.left)*scaleX,y:(e.clientY-r.top)*scaleY}) }}} />
                   </div>
                   {/* Kavel list below canvas */}

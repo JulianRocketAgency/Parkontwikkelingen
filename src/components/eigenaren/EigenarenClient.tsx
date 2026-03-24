@@ -178,7 +178,7 @@ export function EigenarenClient({ owners, kavels }: Props) {
             <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  {['Eigenaar / Kavel', 'Status', 'Betaling', ''].map((h, i) => (
+                  {['Eigenaar', 'Kavel', 'Status', 'Betaling', ''].map((h, i) => (
                     <th key={i} className="px-4 py-3 text-[11px] font-semibold text-[#6e6e73] uppercase tracking-[0.06em] text-left border-b border-black/[0.05] bg-[#f5f5f7]">{h}</th>
                   ))}
                 </tr>
@@ -192,7 +192,7 @@ export function EigenarenClient({ owners, kavels }: Props) {
                     <React.Fragment key={o.id}>
                       {/* Owner header row */}
                       <tr onClick={() => setSelectedId(o.id)} className={`cursor-pointer transition-all ${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : 'hover:[&>td]:bg-black/[0.02]'}`}>
-                        <td className="px-4 pt-3 pb-2" colSpan={4}>
+                        <td className="px-4 pt-3 pb-2" colSpan={5}>
                           <div className="flex items-center gap-2.5">
                             <div className="w-[28px] h-[28px] rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0" style={{ background: o.color }}>{initials(o.name)}</div>
                             <span className="text-[13px] font-semibold text-[#1d1d1f]">{o.name}</span>
@@ -203,7 +203,7 @@ export function EigenarenClient({ owners, kavels }: Props) {
                       {/* Per-kavel rows */}
                       {kv.length === 0 ? (
                         <tr className={`${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : ''} ${!isLast ? '[&>td]:border-b [&>td]:border-black/[0.05]' : ''}`}>
-                          <td className="pl-14 pr-4 pb-3" colSpan={4}><span className="text-[12px] text-[#aeaeb2]">Geen kavels</span></td>
+                          <td className="pl-14 pr-4 pb-3" colSpan={5}><span className="text-[12px] text-[#aeaeb2]">Geen kavels</span></td>
                         </tr>
                       ) : kv.map((k, ki) => {
                         const done = isOpgeleverd(k), active = isActief(k)
@@ -217,10 +217,12 @@ export function EigenarenClient({ owners, kavels }: Props) {
                               ${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : 'hover:[&>td]:bg-black/[0.02]'}
                               ${isKavelLast && !isLast ? '[&>td]:border-b [&>td]:border-black/[0.05]' : ''}
                               ${!isKavelLast ? '[&>td]:border-b [&>td]:border-black/[0.03]' : ''}`}>
-                            {/* Kavel naam */}
-                            <td className="pl-14 pr-4 pb-3 pt-0">
-                              <span className="text-[12px] font-medium text-[#3a3a3c]">Kavel #{k.number}</span>
-                              <span className="text-[11px] text-[#aeaeb2] ml-1.5">{k.type} · {k.uitvoering}</span>
+                            {/* Eigenaar kolom — leeg, want eigenaar staat al in header */}
+                            <td className="pl-14 pr-4 pb-3 pt-0"></td>
+                            {/* Kavel */}
+                            <td className="px-4 pb-3 pt-0">
+                              <span className="text-[12px] font-medium text-[#3a3a3c]">#{k.number}</span>
+                              <span className="text-[11px] text-[#aeaeb2] ml-1">{k.type}</span>
                             </td>
                             {/* Status */}
                             <td className="px-4 pb-3 pt-0">

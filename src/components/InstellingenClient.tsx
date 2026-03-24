@@ -76,16 +76,21 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     setEditingFase(fase)
     setEditingId(null)
     setCurrentPts([])
-    setEditorZoom(1)
     imgRef.current = null
     setEditorW(1)
     setEditorH(1)
+    setEditorZoom(1)
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       imgRef.current = img
-      setEditorW(img.naturalWidth)
-      setEditorH(img.naturalHeight)
+      const w = img.naturalWidth
+      const h = img.naturalHeight
+      setEditorW(w)
+      setEditorH(h)
+      // Calculate zoom to fit in 900x520
+      const fitZoom = Math.min(900 / w, 520 / h, 1)
+      setEditorZoom(Math.round(fitZoom * 100) / 100)
     }
     img.src = url
   }
@@ -136,11 +141,12 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
   function onCanvasClick(e: React.MouseEvent<SVGSVGElement>) {
     if (!editingId) return
     const r = e.currentTarget.getBoundingClientRect()
-    const px = (e.clientX - r.left) / editorZoom
-    const py = (e.clientY - r.top) / editorZoom
+    // Convert to 0-100% of image dimensions
+    const px = (e.clientX - r.left) / r.width * editorW
+    const py = (e.clientY - r.top) / r.height * editorH
     if (currentPts.length >= 3) {
       const fp = currentPts[0]
-      if (Math.hypot(px - fp.x/100*editorW, py - fp.y/100*editorH) < 14) { closePoly(); return }
+      if (Math.hypot(px - fp.x/100*editorW, py - fp.y/100*editorH) < 20) { closePoly(); return }
     }
     setCurrentPts(prev => [...prev, { x: px/editorW*100, y: py/editorH*100 }])
   }
@@ -324,9 +330,8 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                   <div ref={wrapRef} className="relative bg-[#e8e8ed] rounded-2xl overflow-auto" style={{maxHeight: '560px'}}>
                     <div style={{
                       position: 'relative',
-                      width: editorW * editorZoom,
-                      height: editorH * editorZoom,
-                      minWidth: '100%',
+                      width: Math.round(editorW * editorZoom),
+                      height: Math.round(editorH * editorZoom),
                     }}>
                       {imgRef.current && (
                         <img src={imgRef.current.src} alt="plattegrond"
@@ -341,8 +346,8 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                           if (!editingId || currentPts.length === 0) return
                           const r = e.currentTarget.getBoundingClientRect()
                           setHoverPx({
-                            x: (e.clientX - r.left) / editorZoom / (r.width / editorW / editorZoom),
-                            y: (e.clientY - r.top) / editorZoom / (r.height / editorH / editorZoom),
+                            x: (e.clientX - r.left) / r.width * editorW,
+                            y: (e.clientY - r.top) / r.height * editorH,
                           })
                         }}
                       >

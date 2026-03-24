@@ -13,7 +13,6 @@ interface Props { park: Park | null; kavels: Kavel[] }
 type Pt = { x: number; y: number }
 const PARK_ID = '11111111-0000-0000-0000-000000000001'
 
-// Render PDF page to image data URL using pdf.js
 async function pdfToImageUrl(file: File): Promise<string> {
   const pdfjsLib = await import('pdfjs-dist')
   pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
@@ -38,13 +37,13 @@ async function pdfToImageUrl(file: File): Promise<string> {
 export function InstellingenClient({ park, kavels: initial }: Props) {
   const [kavels, setKavels] = useState(initial)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editingFase, setEditingFase] = useState<number | null>(null) // which map we're drawing on
+  const [editingFase, setEditingFase] = useState<number | null>(null)
   const [currentPts, setCurrentPts] = useState<Pt[]>([])
   const [hoverPx, setHoverPx] = useState<{ x: number; y: number } | null>(null)
   const [editorW, setEditorW] = useState(1)
   const [editorH, setEditorH] = useState(1)
-  const [uploading, setUploading] = useState<string | null>(null)
   const [editorZoom, setEditorZoom] = useState(1)
+  const [uploading, setUploading] = useState<string | null>(null)
   const [toast, setToast] = useState('')
   const [deps, setDeps] = useState<Dependency[]>([])
   const [mapPolygons, setMapPolygons] = useState<KavelPolygon[]>([])
@@ -58,7 +57,6 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     start_date: park?.start_date ?? '',
     end_date: park?.end_date ?? '',
   })
-  const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
@@ -67,14 +65,15 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     getParkMaps(PARK_ID).then(setParkMaps)
   }, [])
 
-  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 2500); return () => clearTimeout(t) } }, [toast])
+  useEffect(() => {
+    if (toast) { const t = setTimeout(() => setToast(''), 2500); return () => clearTimeout(t) }
+  }, [toast])
 
   async function savePark() {
     try { await updatePark(PARK_ID, parkForm); setToast('Parkgegevens opgeslagen ✓') }
     catch { setToast('Opslaan mislukt') }
   }
 
-  // Load selected map into editor canvas
   function loadMapIntoEditor(url: string, fase: number | null, mapId?: string) {
     setEditingFase(fase)
     setEditingId(null)
@@ -102,60 +101,19 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     img.src = url
   }
 
-  useEffect(() => { redraw() }, [kavels, currentPts, hoverPx, editingId, editorW, editorH, editingFase])
-
-  function redraw() {
-    const c = canvasRef.current; const img = imgRef.current
-    if (!c || !img || editorW <= 1) return
-    const ctx = c.getContext('2d')!
-    ctx.clearRect(0, 0, editorW, editorH)
-    ctx.drawImage(img, 0, 0, editorW, editorH)
-
-    // Only draw kavels for current fase
-    const faseKavels = editingFase === null ? kavels : kavels.filter(k => k.fase === editingFase)
-    faseKavels.forEach(k => {
-      if (!k.polygon || k.polygon.length < 3) return
-      const done = isOpgeleverd(k), active = isActief(k)
-      ctx.beginPath()
-      k.polygon.forEach((p, i) => i === 0 ? ctx.moveTo(p.x/100*editorW, p.y/100*editorH) : ctx.lineTo(p.x/100*editorW, p.y/100*editorH))
-      ctx.closePath()
-      ctx.fillStyle = done ? 'rgba(48,209,88,.22)' : active ? 'rgba(255,159,10,.22)' : 'rgba(0,113,227,.18)'
-      ctx.fill()
-      ctx.strokeStyle = done ? '#30d158' : active ? '#ff9f0a' : '#0071e3'
-      ctx.lineWidth = 2; ctx.stroke()
-      const cx = k.polygon.reduce((s,p)=>s+p.x,0)/k.polygon.length/100*editorW
-      const cy = k.polygon.reduce((s,p)=>s+p.y,0)/k.polygon.length/100*editorH
-      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.font = 'bold 11px -apple-system,sans-serif'
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.fillText('#' + k.number, cx, cy)
-    })
-
-    if (currentPts.length > 0) {
-      ctx.beginPath()
-      currentPts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x/100*editorW, p.y/100*editorH) : ctx.lineTo(p.x/100*editorW, p.y/100*editorH))
-      if (hoverPx) ctx.lineTo(hoverPx.x, hoverPx.y)
-      ctx.strokeStyle = '#0071e3'; ctx.lineWidth = 2; ctx.setLineDash([5,4]); ctx.stroke(); ctx.setLineDash([])
-      currentPts.forEach((p, i) => {
-        const px = p.x/100*editorW, py = p.y/100*editorH
-        if (i === 0) { ctx.beginPath(); ctx.arc(px,py,13,0,Math.PI*2); ctx.strokeStyle='rgba(0,113,227,.3)'; ctx.lineWidth=1.5; ctx.stroke() }
-        ctx.beginPath(); ctx.arc(px,py,i===0?6:4,0,Math.PI*2)
-        ctx.fillStyle = i===0?'#fff':'#0071e3'; ctx.fill()
-        ctx.strokeStyle='#0071e3'; ctx.lineWidth=2; ctx.stroke()
-      })
-    }
-  }
-
   function onCanvasClick(e: React.MouseEvent<SVGSVGElement>) {
     if (!editingId) return
     const r = e.currentTarget.getBoundingClientRect()
-    // Convert to 0-100% of image dimensions
     const px = (e.clientX - r.left) / r.width * editorW
     const py = (e.clientY - r.top) / r.height * editorH
     if (currentPts.length >= 3) {
       const fp = currentPts[0]
-      // Threshold scales with zoom — easier to close at low zoom levels
-      const threshold = Math.max(20, 40 / editorZoom)
-      if (Math.hypot(px - fp.x/100*editorW, py - fp.y/100*editorH) < threshold) { closePoly(); return }
+      const pxPerUnit = r.width / editorW
+      const threshold = 30 / pxPerUnit
+      if (Math.hypot(px - fp.x/100*editorW, py - fp.y/100*editorH) < threshold) {
+        closePoly()
+        return
+      }
     }
     setCurrentPts(prev => [...prev, { x: px/editorW*100, y: py/editorH*100 }])
   }
@@ -168,13 +126,16 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
       const filtered = prev.filter(p => !(p.kavel_id === editingId && p.map_id === currentMapId))
       return [...filtered, { id: Date.now().toString(), kavel_id: editingId, map_id: currentMapId, polygon }]
     })
-    setCurrentPts([]); setHoverPx(null); setEditingId(null)
+    setCurrentPts([])
+    setHoverPx(null)
+    setEditingId(null)
     setToast('Kavel opgeslagen ✓')
   }
 
   function startEdit(id: string) {
-    setEditingId(id); setCurrentPts([]); setHoverPx(null)
-    // Remove existing polygon for this map so user can redraw
+    setEditingId(id)
+    setCurrentPts([])
+    setHoverPx(null)
     if (currentMapId) {
       setMapPolygons(prev => prev.filter(p => !(p.kavel_id === id && p.map_id === currentMapId)))
     }
@@ -186,21 +147,16 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     setUploading(faseKey)
     try {
       let uploadFile = file
-      let url: string
-
       if (file.type === 'application/pdf') {
-        // Convert PDF to high-res PNG
         setToast('PDF verwerken…')
         const dataUrl = await pdfToImageUrl(file)
         const res = await fetch(dataUrl)
         const blob = await res.blob()
         uploadFile = new File([blob], file.name.replace('.pdf', '.png'), { type: 'image/png' })
       }
-
-      url = await upsertParkMap(PARK_ID, fase, uploadFile)
+      await upsertParkMap(PARK_ID, fase, uploadFile)
       const freshMaps = await getParkMaps(PARK_ID)
       setParkMaps(freshMaps)
-      // Cache buster zodat de nieuwe afbeelding geladen wordt
       const uploaded = freshMaps.find(m => m.fase === fase)
       if (uploaded) loadMapIntoEditor(uploaded.map_url + '?t=' + Date.now(), fase, uploaded.id)
       setToast('Plattegrond geüpload ✓')
@@ -237,15 +193,13 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
 
   const fases = [...new Set(kavels.map(k => k.fase))].sort()
   const allMaps = [
-    { fase: null, label: 'Totaaloverzicht' },
-    ...fases.map(f => ({ fase: f, label: `Fase ${f}` }))
+    { fase: null as number | null, label: 'Totaaloverzicht' },
+    ...fases.map(f => ({ fase: f as number | null, label: `Fase ${f}` }))
   ]
   const optieOptions = OPTIES.map(o => ({ key: o.key, label: o.label }))
   const statusOptions = Object.entries(STATUS_LABELS).map(([key, label]) => ({ key, label }))
   const ooDeps = deps.filter(d => d.type === 'optie_optie')
   const soDeps = deps.filter(d => d.type === 'status_optie')
-
-  const activeMap = parkMaps.find(m => m.fase === editingFase)
   const faseKavelsForEditor = editingFase === null ? kavels : kavels.filter(k => k.fase === editingFase)
 
   const Chip = ({ label, color }: { label: string; color: 'blue'|'green'|'amber' }) => {
@@ -260,19 +214,16 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
           {toast}
         </div>
       )}
-
       <div className="mb-6">
         <h1 className="text-[26px] font-bold tracking-[-0.5px]">Instellingen</h1>
         <p className="text-[14px] text-[#6e6e73] mt-0.5">Park & platform configuratie</p>
       </div>
-
       <div className="flex flex-col gap-4">
 
-        {/* ── Plattegronden ── */}
+        {/* Plattegronden */}
         <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
           <div className="text-[15px] font-semibold mb-1">Plattegronden & kavelindeling</div>
           <div className="text-[13px] text-[#6e6e73] mb-5">Upload een plattegrond per fase en het totaaloverzicht. Ondersteunt PNG, JPG en PDF.</div>
-
           <div className="grid grid-cols-[200px_1fr] gap-6">
             {/* Left: map selector */}
             <div>
@@ -283,19 +234,15 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                   const isActive = editingFase === fase && imgRef.current !== null
                   const isUploading = uploading === (fase === null ? 'overall' : `fase-${fase}`)
                   return (
-                    <div key={String(fase)}
-                      className={`rounded-[10px] border overflow-hidden transition-all
-                        ${isActive ? 'border-[rgba(0,113,227,0.4)] bg-[rgba(0,113,227,0.05)]' : 'border-black/[0.06] bg-[#f5f5f7]'}`}>
+                    <div key={String(fase)} className={`rounded-[10px] border overflow-hidden transition-all ${isActive ? 'border-[rgba(0,113,227,0.4)] bg-[rgba(0,113,227,0.05)]' : 'border-black/[0.06] bg-[#f5f5f7]'}`}>
                       <div className="flex items-center gap-2 px-3 py-2">
                         <span className={`text-[12px] font-medium flex-1 ${isActive ? 'text-[#004f9e]' : 'text-[#3a3a3c]'}`}>{label}</span>
-                        {existing && (
-                          <span className="text-[10px] font-semibold text-[#1a7a32]">✓</span>
-                        )}
+                        {existing && <span className="text-[10px] font-semibold text-[#1a7a32]">✓</span>}
                       </div>
                       <div className="flex gap-1 px-2 pb-2">
                         {existing ? (
                           <>
-                            <button onClick={() => loadMapIntoEditor(existing.map_url, fase)}
+                            <button onClick={() => loadMapIntoEditor(existing.map_url, fase, existing.id)}
                               className="flex-1 py-1 rounded-lg bg-white border border-black/[0.08] text-[11px] text-[#3a3a3c] hover:bg-[#e8e8ed] transition-all">
                               Bewerken
                             </button>
@@ -307,8 +254,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                         ) : (
                           <label className="flex-1 py-1 rounded-lg bg-[#0071e3] text-white text-[11px] text-center cursor-pointer hover:bg-[#0077ed] transition-all">
                             {isUploading ? 'Uploaden…' : '+ Upload'}
-                            <input type="file" accept="image/*,.pdf" className="hidden"
-                              onChange={e => handleMapUpload(fase, e)} disabled={!!uploading} />
+                            <input type="file" accept="image/*,.pdf" className="hidden" onChange={e => handleMapUpload(fase, e)} disabled={!!uploading} />
                           </label>
                         )}
                       </div>
@@ -327,10 +273,11 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                 </div>
               ) : (
                 <div>
+                  {/* Toolbar */}
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className="text-[12px] text-[#6e6e73] flex-1">
                       {editingId
-                        ? `Kavel #${kavels.find(k=>k.id===editingId)?.number} — klik punten, sluit op het startpunt`
+                        ? `Kavel #${kavels.find(k=>k.id===editingId)?.number} — klik punten op de kaart`
                         : `${editingFase === null ? 'Totaaloverzicht' : `Fase ${editingFase}`} — selecteer een kavel om te tekenen`}
                     </span>
                     {currentPts.length > 0 && (
@@ -342,18 +289,19 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                         <button onClick={() => { setCurrentPts([]); setEditingId(null) }} className="px-2.5 py-1 rounded-lg text-[12px] bg-black/[0.06] hover:bg-black/10">Annuleren</button>
                       </>
                     )}
+                    {/* Zoom controls */}
+                    <div className="flex items-center gap-1 ml-auto">
+                      <button onClick={() => setEditorZoom(z => Math.min(+(z+0.25).toFixed(2), 4))} className="w-7 h-7 rounded-lg bg-[#f5f5f7] text-[14px] font-medium hover:bg-[#e8e8ed] flex items-center justify-center">+</button>
+                      <button onClick={() => setEditorZoom(z => { const fit = Math.min(900/editorW, 520/editorH, 1); return Math.round(fit*100)/100 })} className="px-2 h-7 rounded-lg bg-[#f5f5f7] text-[#6e6e73] text-[10px] hover:bg-[#e8e8ed] min-w-[44px] text-center">{Math.round(editorZoom*100)}%</button>
+                      <button onClick={() => setEditorZoom(z => Math.max(+(z-0.25).toFixed(2), 0.1))} className="w-7 h-7 rounded-lg bg-[#f5f5f7] text-[14px] font-medium hover:bg-[#e8e8ed] flex items-center justify-center">−</button>
+                    </div>
                   </div>
-                  {/* Scrollable container */}
+
+                  {/* Editor canvas */}
                   <div ref={wrapRef} className="relative bg-[#e8e8ed] rounded-2xl overflow-auto" style={{maxHeight: '560px'}}>
-                    <div style={{
-                      position: 'relative',
-                      width: Math.round(editorW * editorZoom),
-                      height: Math.round(editorH * editorZoom),
-                    }}>
-                      {imgRef.current && (
-                        <img src={imgRef.current.src} alt="plattegrond"
-                          style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'fill',userSelect:'none',pointerEvents:'none'}} />
-                      )}
+                    <div style={{ position: 'relative', width: Math.round(editorW * editorZoom), height: Math.round(editorH * editorZoom) }}>
+                      <img src={imgRef.current.src} alt="plattegrond"
+                        style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'fill',userSelect:'none',pointerEvents:'none'}} />
                       <svg
                         style={{position:'absolute',inset:0,width:'100%',height:'100%',cursor: editingId ? 'crosshair' : 'default'}}
                         viewBox={`0 0 ${editorW} ${editorH}`}
@@ -362,12 +310,10 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                         onMouseMove={e => {
                           if (!editingId || currentPts.length === 0) return
                           const r = e.currentTarget.getBoundingClientRect()
-                          setHoverPx({
-                            x: (e.clientX - r.left) / r.width * editorW,
-                            y: (e.clientY - r.top) / r.height * editorH,
-                          })
+                          setHoverPx({ x: (e.clientX - r.left) / r.width * editorW, y: (e.clientY - r.top) / r.height * editorH })
                         }}
                       >
+                        {/* Saved polygons */}
                         {mapPolygons.map(mp => {
                           const k = kavels.find(k => k.id === mp.kavel_id)
                           if (!k || mp.polygon.length < 3) return null
@@ -382,11 +328,12 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                                 stroke={done?'#30d158':active?'#ff9f0a':'#0071e3'}
                                 strokeWidth={Math.max(1, 2/editorZoom)} />
                               <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
-                                fontSize={14} fontWeight="bold" fill="rgba(0,0,0,.7)"
+                                fontSize={Math.max(10, 14/editorZoom)} fontWeight="bold" fill="rgba(0,0,0,.7)"
                                 fontFamily="-apple-system,sans-serif">#{k.number}</text>
                             </g>
                           )
                         })}
+                        {/* In-progress polygon */}
                         {currentPts.length > 0 && (
                           <g>
                             <polyline
@@ -394,14 +341,16 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                                 ...currentPts.map(p => `${p.x/100*editorW},${p.y/100*editorH}`),
                                 ...(hoverPx ? [`${hoverPx.x},${hoverPx.y}`] : [])
                               ].join(' ')}
-                              fill="none" stroke="#0071e3" strokeWidth={Math.max(1, 2/editorZoom)} strokeDasharray={`${5/editorZoom},${4/editorZoom}`} />
+                              fill="none" stroke="#0071e3"
+                              strokeWidth={Math.max(1, 2/editorZoom)}
+                              strokeDasharray={`${5/editorZoom},${4/editorZoom}`} />
                             {currentPts.map((p, i) => {
                               const px = p.x/100*editorW, py = p.y/100*editorH
-                              const r = Math.max(3, 8/editorZoom)
-                              const rOuter = Math.max(6, 18/editorZoom)
+                              const r = Math.max(4, 8/editorZoom)
+                              const rOuter = Math.max(8, 20/editorZoom)
                               return (
                                 <g key={i}>
-                                  {i === 0 && <circle cx={px} cy={py} r={rOuter} fill="none" stroke="rgba(0,113,227,.35)" strokeWidth={Math.max(1, 1.5/editorZoom)} />}
+                                  {i === 0 && <circle cx={px} cy={py} r={rOuter} fill="rgba(0,113,227,.15)" stroke="rgba(0,113,227,.5)" strokeWidth={Math.max(1, 1.5/editorZoom)} />}
                                   <circle cx={px} cy={py} r={r} fill={i===0?'#fff':'#0071e3'} stroke="#0071e3" strokeWidth={Math.max(1, 2/editorZoom)} />
                                 </g>
                               )
@@ -411,7 +360,8 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                       </svg>
                     </div>
                   </div>
-                  {/* Kavel list below canvas */}
+
+                  {/* Kavel list */}
                   <div className="mt-3">
                     <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-2">Kavels — klik om gebied te tekenen</div>
                     <div className="flex flex-wrap gap-1.5">
@@ -438,12 +388,11 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
           </div>
         </div>
 
-        {/* ── Afhankelijkheden ── */}
+        {/* Afhankelijkheden */}
         <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
           <div className="text-[15px] font-semibold mb-1">Afhankelijkheden</div>
           <div className="text-[13px] text-[#6e6e73] mb-5">Stel in welke opties samenhangen en wanneer opties beschikbaar worden.</div>
           <div className="grid grid-cols-2 gap-6">
-            {/* Optie → Optie */}
             <div>
               <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.07em] mb-3 pb-2 border-b border-black/[0.05]">Optie vereist optie</div>
               <div className="text-[12px] text-[#6e6e73] mb-3">Als optie A besteld wordt, is optie B automatisch vereist</div>
@@ -454,7 +403,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                     <Chip label={optieOptions.find(o=>o.key===d.trigger_key)?.label ?? d.trigger_key} color="blue" />
                     <span className="text-[11px] text-[#aeaeb2]">→ vereist</span>
                     <Chip label={optieOptions.find(o=>o.key===d.requires_key)?.label ?? d.requires_key} color="amber" />
-                    <button onClick={() => removeDep(d.id)} className="ml-auto text-[#aeaeb2] hover:text-[#ff3b30] text-[16px] leading-none transition-all">×</button>
+                    <button onClick={() => removeDep(d.id)} className="ml-auto text-[#aeaeb2] hover:text-[#ff3b30] text-[16px] leading-none">×</button>
                   </div>
                 ))}
               </div>
@@ -477,7 +426,6 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                 </button>
               </div>
             </div>
-            {/* Status → Optie */}
             <div>
               <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.07em] mb-3 pb-2 border-b border-black/[0.05]">Bouwstatus vrijgeeft optie</div>
               <div className="text-[12px] text-[#6e6e73] mb-3">Een optie kan pas worden uitgevoerd als een bouwstap gereed is</div>
@@ -488,7 +436,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                     <Chip label={statusOptions.find(o=>o.key===d.trigger_key)?.label ?? d.trigger_key} color="green" />
                     <span className="text-[11px] text-[#aeaeb2]">→ vrijgeeft</span>
                     <Chip label={optieOptions.find(o=>o.key===d.requires_key)?.label ?? d.requires_key} color="blue" />
-                    <button onClick={() => removeDep(d.id)} className="ml-auto text-[#aeaeb2] hover:text-[#ff3b30] text-[16px] leading-none transition-all">×</button>
+                    <button onClick={() => removeDep(d.id)} className="ml-auto text-[#aeaeb2] hover:text-[#ff3b30] text-[16px] leading-none">×</button>
                   </div>
                 ))}
               </div>
@@ -514,7 +462,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
           </div>
         </div>
 
-        {/* ── Bottom grid ── */}
+        {/* Bottom grid */}
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
             <div className="text-[15px] font-semibold mb-1">Parkgegevens</div>

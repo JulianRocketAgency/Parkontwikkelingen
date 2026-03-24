@@ -178,7 +178,7 @@ export function EigenarenClient({ owners, kavels }: Props) {
             <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  {['Eigenaar', 'Kavel', 'Status', 'Betaling', ''].map((h, i) => (
+                  {['', 'Naam', 'Kavel(s)', 'Status', 'Betaling', ''].map((h, i) => (
                     <th key={i} className="px-4 py-3 text-[11px] font-semibold text-[#6e6e73] uppercase tracking-[0.06em] text-left border-b border-black/[0.05] bg-[#f5f5f7]">{h}</th>
                   ))}
                 </tr>
@@ -188,67 +188,80 @@ export function EigenarenClient({ owners, kavels }: Props) {
                   const kv = kavels.filter(k => k.owner_id === o.id)
                   const sel = selectedId === o.id
                   const isLast = i === filtered.length - 1
+                  const allDone = kv.length > 0 && kv.every(isOpgeleverd)
+                  const anyActive = kv.some(isActief)
                   return (
-                    <React.Fragment key={o.id}>
-                      {/* Owner header row */}
-                      <tr onClick={() => setSelectedId(o.id)} className={`cursor-pointer transition-all ${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : 'hover:[&>td]:bg-black/[0.02]'}`}>
-                        <td className="px-4 pt-3 pb-2" colSpan={5}>
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-[28px] h-[28px] rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0" style={{ background: o.color }}>{initials(o.name)}</div>
-                            <span className="text-[13px] font-semibold text-[#1d1d1f]">{o.name}</span>
-                            <span className="text-[12px] text-[#aeaeb2]">{o.email}</span>
-                          </div>
-                        </td>
-                      </tr>
-                      {/* Per-kavel rows */}
-                      {kv.length === 0 ? (
-                        <tr className={`${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : ''} ${!isLast ? '[&>td]:border-b [&>td]:border-black/[0.05]' : ''}`}>
-                          <td className="pl-14 pr-4 pb-3" colSpan={5}><span className="text-[12px] text-[#aeaeb2]">Geen kavels</span></td>
-                        </tr>
-                      ) : kv.map((k, ki) => {
-                        const done = isOpgeleverd(k), active = isActief(k)
-                        const kBetalingen = betalingen.filter(b => b.kavel_id === k.id)
-                        const maxIdx = Math.max(-1, ...kBetalingen.map(b => TERMIJN_VOLGORDE.indexOf(b.termijn_key)))
-                        const currentTermijn = maxIdx >= 0 ? kBetalingen.find(b => b.termijn_key === TERMIJN_VOLGORDE[maxIdx]) : null
-                        const isKavelLast = ki === kv.length - 1
-                        return (
-                          <tr key={k.id} onClick={() => setSelectedId(o.id)}
-                            className={`cursor-pointer transition-all
-                              ${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : 'hover:[&>td]:bg-black/[0.02]'}
-                              ${isKavelLast && !isLast ? '[&>td]:border-b [&>td]:border-black/[0.05]' : ''}
-                              ${!isKavelLast ? '[&>td]:border-b [&>td]:border-black/[0.03]' : ''}`}>
-                            {/* Eigenaar kolom — leeg, want eigenaar staat al in header */}
-                            <td className="pl-14 pr-4 pb-3 pt-0"></td>
-                            {/* Kavel */}
-                            <td className="px-4 pb-3 pt-0">
-                              <span className="text-[12px] font-medium text-[#3a3a3c]">#{k.number}</span>
-                              <span className="text-[11px] text-[#aeaeb2] ml-1">{k.type}</span>
-                            </td>
-                            {/* Status */}
-                            <td className="px-4 pb-3 pt-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${done ? 'bg-[rgba(48,209,88,0.13)] text-[#1a7a32]' : active ? 'bg-[rgba(255,159,10,0.12)] text-[#a05a00]' : 'bg-black/[0.06] text-[#6e6e73]'}`}>
+                    <tr key={o.id} onClick={() => setSelectedId(o.id)}
+                      className={`cursor-pointer transition-all align-top
+                        ${sel ? '[&>td]:bg-[rgba(0,113,227,0.08)]' : 'hover:[&>td]:bg-black/[0.02]'}
+                        ${!isLast ? '[&>td]:border-b [&>td]:border-black/[0.05]' : ''}`}>
+                      {/* Avatar */}
+                      <td className="px-4 py-3">
+                        <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-semibold text-white mt-0.5"
+                          style={{ background: o.color }}>{initials(o.name)}</div>
+                      </td>
+                      {/* Naam */}
+                      <td className="px-4 py-3">
+                        <div className="text-[13px] font-medium text-[#1d1d1f]">{o.name}</div>
+                        <div className="text-[12px] text-[#6e6e73]">{o.email}</div>
+                      </td>
+                      {/* Kavel(s) */}
+                      <td className="px-4 py-3">
+                        {kv.length === 0
+                          ? <span className="text-[12px] text-[#aeaeb2]">—</span>
+                          : kv.map(k => (
+                            <div key={k.id} className="text-[12px] text-[#6e6e73] leading-relaxed">
+                              #{k.number} <span className="text-[#aeaeb2]">{k.type}</span>
+                            </div>
+                          ))
+                        }
+                      </td>
+                      {/* Status */}
+                      <td className="px-4 py-3">
+                        {kv.length === 0
+                          ? <span className="text-[11px] text-[#aeaeb2]">—</span>
+                          : kv.map(k => {
+                            const done = isOpgeleverd(k), active = isActief(k)
+                            return (
+                              <div key={k.id} className="mb-1 last:mb-0 flex items-center gap-1.5 flex-wrap">
+                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full
+                                  ${done ? 'bg-[rgba(48,209,88,0.13)] text-[#1a7a32]'
+                                  : active ? 'bg-[rgba(255,159,10,0.12)] text-[#a05a00]'
+                                  : 'bg-black/[0.06] text-[#6e6e73]'}`}>
                                   {done ? 'Opgeleverd' : active ? 'In uitvoering' : 'Gepland'}
                                 </span>
-                                {k.verkocht && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.13)] text-[#1a7a32]">Verkocht</span>}
+                                {k.verkocht && (
+                                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.13)] text-[#1a7a32]">Verkocht</span>
+                                )}
                               </div>
-                            </td>
-                            {/* Betaling */}
-                            <td className="px-4 pb-3 pt-0">
-                              {currentTermijn ? (
-                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">
-                                  {maxIdx + 1}/{TOTAL_TERMIJNEN} · {currentTermijn.naam}
-                                </span>
-                              ) : (
-                                <span className="text-[11px] text-[#aeaeb2]">0/{TOTAL_TERMIJNEN}</span>
-                              )}
-                            </td>
-                            {/* Arrow */}
-                            <td className="px-4 pb-3 pt-0 text-right text-[#aeaeb2] text-[12px]">→</td>
-                          </tr>
-                        )
-                      })}
-                    </React.Fragment>
+                            )
+                          })
+                        }
+                      </td>
+                      {/* Betaling */}
+                      <td className="px-4 py-3">
+                        {kv.length === 0
+                          ? <span className="text-[11px] text-[#aeaeb2]">—</span>
+                          : kv.map(k => {
+                            const kBetalingen = betalingen.filter(b => b.kavel_id === k.id)
+                            const maxIdx = Math.max(-1, ...kBetalingen.map(b => TERMIJN_VOLGORDE.indexOf(b.termijn_key)))
+                            const currentTermijn = maxIdx >= 0 ? kBetalingen.find(b => b.termijn_key === TERMIJN_VOLGORDE[maxIdx]) : null
+                            return (
+                              <div key={k.id} className="mb-1 last:mb-0">
+                                {currentTermijn ? (
+                                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">
+                                    {maxIdx + 1}/{TOTAL_TERMIJNEN} · {currentTermijn.naam}
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] text-[#aeaeb2]">0/{TOTAL_TERMIJNEN}</span>
+                                )}
+                              </div>
+                            )
+                          })
+                        }
+                      </td>
+                      <td className="px-4 py-3 text-right text-[#aeaeb2] text-[12px]">→</td>
+                    </tr>
                   )
                 })}
                 {filtered.length === 0 && (

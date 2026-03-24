@@ -201,17 +201,17 @@ export function EigenarenClient({ owners, kavels }: Props) {
                           style={{ background: o.color }}>{initials(o.name)}</div>
                       </td>
                       {/* Naam */}
-                      <td className="px-4 py-3">
-                        <div className="text-[13px] font-medium text-[#1d1d1f]">{o.name}</div>
-                        <div className="text-[12px] text-[#6e6e73]">{o.email}</div>
+                      <td className="px-4 py-3 min-w-0">
+                        <div className="text-[13px] font-medium text-[#1d1d1f] truncate">{o.name}</div>
+                        <div className="text-[12px] text-[#6e6e73] truncate">{o.email}</div>
                       </td>
                       {/* Kavel(s) */}
                       <td className="px-4 py-3">
                         {kv.length === 0
                           ? <span className="text-[12px] text-[#aeaeb2]">—</span>
                           : kv.map(k => (
-                            <div key={k.id} className="text-[12px] text-[#6e6e73] leading-relaxed">
-                              #{k.number} <span className="text-[#aeaeb2]">{k.type}</span>
+                            <div key={k.id} className="text-[12px] text-[#6e6e73] leading-relaxed whitespace-nowrap">
+                              <span className="font-medium text-[#3a3a3c]">#{k.number}</span> <span className="text-[#aeaeb2]">{k.type}</span>
                             </div>
                           ))
                         }
@@ -249,7 +249,7 @@ export function EigenarenClient({ owners, kavels }: Props) {
                             return (
                               <div key={k.id} className="mb-1 last:mb-0">
                                 {currentTermijn ? (
-                                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">
+                                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e] inline-block">
                                     {maxIdx + 1}/{TOTAL_TERMIJNEN} · {currentTermijn.naam}
                                   </span>
                                 ) : (

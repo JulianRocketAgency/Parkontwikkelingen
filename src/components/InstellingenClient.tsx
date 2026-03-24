@@ -75,30 +75,31 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     setEditingFase(fase)
     setEditingId(null)
     setCurrentPts([])
+    imgRef.current = null
+    setEditorW(1)
+    setEditorH(1)
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       imgRef.current = img
-      // Wait for DOM to be ready before measuring
-      requestAnimationFrame(() => {
-        const wrap = wrapRef.current
-        if (!wrap) return
-        const maxW = wrap.clientWidth || 700
-        const maxH = 520
-        const scale = Math.min(maxW / img.width, maxH / img.height)
-        const w = Math.round(img.width * scale)
-        const h = Math.round(img.height * scale)
-        setEditorW(w)
-        setEditorH(h)
-        const c = canvasRef.current
-        if (!c) return
+      const wrap = wrapRef.current
+      const maxW = (wrap?.clientWidth || 700)
+      const maxH = 500
+      const scale = Math.min(maxW / img.width, maxH / img.height)
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      // Directly set canvas dimensions and draw
+      const c = canvasRef.current
+      if (c) {
         c.width = w
         c.height = h
         c.style.width = w + 'px'
         c.style.height = h + 'px'
-        const ctx = c.getContext('2d')!
-        ctx.drawImage(img, 0, 0, w, h)
-      })
+        c.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      }
+      // Update state for overlays (polygons)
+      setEditorW(w)
+      setEditorH(h)
     }
     img.src = url
   }

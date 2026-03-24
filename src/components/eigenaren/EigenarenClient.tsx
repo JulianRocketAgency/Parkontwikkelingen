@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { useState, useMemo, useEffect } from 'react'
 import type { Owner, Kavel } from '@/types'
 import { isOpgeleverd, isActief, getKavelPct } from '@/types'
@@ -185,44 +186,73 @@ export function EigenarenClient({ owners, kavels }: Props) {
               <tbody>
                 {filtered.map((o, i) => {
                   const kv = kavels.filter(k => k.owner_id === o.id)
-                  const kNums = kv.map(k => '#' + k.number).join(', ') || '—'
-                  const allDone = kv.length > 0 && kv.every(isOpgeleverd)
-                  const anyActive = kv.some(isActief)
-                  const bSum = ownerBetalingSummary[o.id]
                   const sel = selectedId === o.id
+                  const isLast = i === filtered.length - 1
+
                   return (
-                    <tr key={o.id} onClick={() => setSelectedId(o.id)}
-                      className={`cursor-pointer transition-all
-                        ${sel ? '[&>td]:bg-[rgba(0,113,227,0.08)]' : 'hover:[&>td]:bg-black/[0.02]'}
-                        ${i < filtered.length - 1 ? '[&>td]:border-b [&>td]:border-black/[0.05]' : ''}`}>
-                      <td className="px-4 py-3">
-                        <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-semibold text-white"
-                          style={{ background: o.color }}>{initials(o.name)}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-[13px] font-medium text-[#1d1d1f]">{o.name}</div>
-                        <div className="text-[12px] text-[#6e6e73]">{o.email}</div>
-                      </td>
-                      <td className="px-4 py-3 text-[12px] text-[#6e6e73]">{kNums}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full
-                          ${allDone ? 'bg-[rgba(48,209,88,0.13)] text-[#1a7a32]'
-                          : anyActive ? 'bg-[rgba(255,159,10,0.12)] text-[#a05a00]'
-                          : 'bg-black/[0.06] text-[#6e6e73]'}`}>
-                          {allDone ? 'Opgeleverd' : anyActive ? 'In uitvoering' : 'Gepland'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {bSum && bSum.current > 0 ? (
-                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">
-                            {bSum.current}/{TOTAL_TERMIJNEN} · {bSum.currentNaam}
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-[#aeaeb2]">0/{TOTAL_TERMIJNEN}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right text-[#aeaeb2] text-[12px]">→</td>
-                    </tr>
+                    <React.Fragment key={o.id}>
+                      {/* Owner header row */}
+                      <tr onClick={() => setSelectedId(o.id)}
+                        className={`cursor-pointer transition-all ${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : 'hover:[&>td]:bg-black/[0.02]'}`}>
+                        <td className="px-4 pt-3 pb-1" colSpan={5}>
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-[28px] h-[28px] rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0"
+                              style={{ background: o.color }}>{initials(o.name)}</div>
+                            <div>
+                              <span className="text-[13px] font-semibold text-[#1d1d1f]">{o.name}</span>
+                              <span className="text-[12px] text-[#aeaeb2] ml-2">{o.email}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 pt-3 pb-1 text-right text-[#aeaeb2] text-[12px]">→</td>
+                      </tr>
+                      {/* Per-kavel rows */}
+                      {kv.length === 0 ? (
+                        <tr onClick={() => setSelectedId(o.id)}
+                          className={`cursor-pointer ${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : 'hover:[&>td]:bg-black/[0.02]'}
+                            ${!isLast ? '[&>td]:border-b [&>td]:border-black/[0.05]' : ''}`}>
+                          <td className="px-4 pt-1 pb-3 pl-14" colSpan={6}>
+                            <span className="text-[12px] text-[#aeaeb2]">Geen kavels gekoppeld</span>
+                          </td>
+                        </tr>
+                      ) : kv.map((k, ki) => {
+                        const done = isOpgeleverd(k), active = isActief(k)
+                        const kBetalingen = betalingen.filter(b => b.kavel_id === k.id)
+                        const maxIdx = Math.max(-1, ...kBetalingen.map(b => TERMIJN_VOLGORDE.indexOf(b.termijn_key)))
+                        const currentTermijn = maxIdx >= 0 ? kBetalingen.find(b => b.termijn_key === TERMIJN_VOLGORDE[maxIdx]) : null
+                        const isKavelLast = ki === kv.length - 1
+                        return (
+                          <tr key={k.id} onClick={() => setSelectedId(o.id)}
+                            className={`cursor-pointer transition-all
+                              ${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : 'hover:[&>td]:bg-black/[0.02]'}
+                              ${isKavelLast && !isLast ? '[&>td]:border-b [&>td]:border-black/[0.05]' : ''}
+                              ${!isKavelLast ? '[&>td]:border-b [&>td]:border-black/[0.03]' : ''}`}>
+                            <td className="px-4 pt-1 pb-3 pl-14" colSpan={1}>
+                              <span className="text-[12px] font-medium text-[#6e6e73]">Kavel #{k.number}</span>
+                              <span className="text-[11px] text-[#aeaeb2] ml-1.5">{k.type}</span>
+                            </td>
+                            <td className="px-4 pt-1 pb-3">
+                              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full
+                                ${done ? 'bg-[rgba(48,209,88,0.13)] text-[#1a7a32]'
+                                : active ? 'bg-[rgba(255,159,10,0.12)] text-[#a05a00]'
+                                : 'bg-black/[0.06] text-[#6e6e73]'}`}>
+                                {done ? 'Opgeleverd' : active ? 'In uitvoering' : 'Gepland'}
+                              </span>
+                              {k.verkocht && <span className="ml-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.13)] text-[#1a7a32]">Verkocht</span>}
+                            </td>
+                            <td className="px-4 pt-1 pb-3" colSpan={3}>
+                              {currentTermijn ? (
+                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">
+                                  {maxIdx + 1}/{TOTAL_TERMIJNEN} · {currentTermijn.naam}
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-[#aeaeb2]">0/{TOTAL_TERMIJNEN}</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </React.Fragment>
                   )
                 })}
                 {filtered.length === 0 && (

@@ -44,6 +44,7 @@ export interface Kavel {
   gereed_bouwer: string | null
   transport_date: string | null
   huisdieren: boolean
+  verkocht: boolean
   notitie: string | null
   polygon: PolygonPoint[] | null
   created_at: string
@@ -58,6 +59,7 @@ export interface KavelStatus {
   kavel_id: string
   geplaatst: boolean
   aansloten: boolean
+  bouw_gestart: boolean
   tuin_aangelegd: boolean
   meubels_geplaatst: boolean
   opgestart: boolean
@@ -124,7 +126,7 @@ export function getOptie(opties: KavelOpties | null | undefined, key: string): O
 export function getKavelPct(status: KavelStatus | null | undefined): number {
   if (!status) return 0
   const vals = [
-    status.geplaatst, status.aansloten, status.tuin_aangelegd,
+    status.geplaatst, status.bouw_gestart, status.aansloten, status.tuin_aangelegd,
     status.meubels_geplaatst, status.opgestart, status.itt_aangesloten,
     status.intern_opgeleverd, status.opgeleverd,
   ]
@@ -141,6 +143,7 @@ export function isActief(k: Kavel): boolean {
 
 export const STATUS_LABELS: Record<string, string> = {
   geplaatst:         'Geplaatst',
+  bouw_gestart:      'Bouw gestart',
   aansloten:         'Aangesloten',
   tuin_aangelegd:    'Tuin aangelegd',
   meubels_geplaatst: 'Meubels geplaatst',

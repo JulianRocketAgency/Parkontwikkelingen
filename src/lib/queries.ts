@@ -269,65 +269,167 @@ export async function upsertKavelPolygonForMap(
   if (error) throw error
 }
 
-// ── Betalingstermijnen ────────────────────────────────────────
+// ── Fase status ───────────────────────────────────────────────
+export interface FaseStatus {
+  id: string
+  park_id: string
+  fase: number
+  gestart_at: string | null
+}
+
+export async function getFaseStatussen(parkId: string): Promise<FaseStatus[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('fase_status').select('*').eq('park_id', parkId)
+  return data ?? []
+}
+
+export async function startFase(parkId: string, fase: number): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('fase_status').upsert(
+    { park_id: parkId, fase, gestart_at: new Date().toISOString() },
+    { onConflict: 'park_id,fase' }
+  )
+}
+
+// ── Kavel owners (meerdere per kavel) ─────────────────────────
+export interface KavelOwner {
+  id: string
+  kavel_id: string
+  owner_id: string
+  rol: string
+  owner?: Owner
+}
+
+export async function getKavelOwners(kavelId: string): Promise<KavelOwner[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('kavel_owners')
+    .select('*, owner:owners(*)')
+    .eq('kavel_id', kavelId)
+  return data ?? []
+}
+
+export async function addKavelOwner(kavelId: string, ownerId: string, rol = 'eigenaar'): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('kavel_owners').upsert(
+    { kavel_id: kavelId, owner_id: ownerId, rol },
+    { onConflict: 'kavel_id,owner_id' }
+  )
+}
+
+export async function removeKavelOwner(id: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('kavel_owners').delete().eq('id', id)
+}
+
+// ── Termijn config ────────────────────────────────────────────
+export interface TermijnConfig {
+  id: string
+  park_id: string
+  termijn_key: string
+  naam: string
+  trigger: string
+  actief: boolean
+  volgorde: number
+}
+
+export async function getTermijnConfig(parkId: string): Promise<TermijnConfig[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('termijn_config')
+    .select('*')
+    .eq('park_id', parkId)
+    .order('volgorde')
+  return data ?? []
+}
+
+export async function updateTermijnConfig(id: string, updates: Partial<TermijnConfig>): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('termijn_config').update(updates).eq('id', id)
+}
+
+// ── Betalingstermijnen (event-based) ──────────────────────────
 export interface Betalingstermijn {
   id: string
   owner_id: string
-  omschrijving: string
-  bedrag: number
-  vervaldatum: string
-  status: 'openstaand' | 'betaald' | 'te_laat' | 'deelbetaling'
-  notitie: string | null
+  kavel_id: string
+  termijn_key: string
+  naam: string
+  status: 'verwacht' | 'actief' | 'voldaan'
+  triggered_at: string | null
   created_at: string
 }
 
 export async function getBetalingen(parkId: string): Promise<Betalingstermijn[]> {
   const supabase = createClient()
-  const ownerIds = await supabase
-    .from('owners')
-    .select('id')
-    .eq('park_id', parkId)
-  if (ownerIds.error || !ownerIds.data) return []
-  const ids = ownerIds.data.map(o => o.id)
-  const { data, error } = await supabase
+  const { data: owners } = await supabase.from('owners').select('id').eq('park_id', parkId)
+  if (!owners?.length) return []
+  const { data } = await supabase
     .from('betalingstermijnen')
     .select('*')
-    .in('owner_id', ids)
-    .order('vervaldatum', { ascending: true })
-  if (error) { console.error('getBetalingen:', error); return [] }
+    .in('owner_id', owners.map(o => o.id))
+    .order('created_at')
   return data ?? []
 }
 
-export async function upsertBetaling(
-  b: Omit<Betalingstermijn, 'id' | 'created_at'>
-): Promise<Betalingstermijn | null> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('betalingstermijnen')
-    .insert(b)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function updateBetaling(
-  id: string,
-  updates: Partial<Omit<Betalingstermijn, 'id' | 'created_at'>>
+export async function triggerBetalingstermijn(
+  kavelId: string,
+  ownerId: string,
+  termijnKey: string,
+  naam: string
 ): Promise<void> {
   const supabase = createClient()
-  const { error } = await supabase
+  // Check if already exists
+  const { data: existing } = await supabase
     .from('betalingstermijnen')
-    .update(updates)
-    .eq('id', id)
-  if (error) throw error
+    .select('id')
+    .eq('kavel_id', kavelId)
+    .eq('termijn_key', termijnKey)
+    .single()
+  if (existing) return // already triggered
+
+  await supabase.from('betalingstermijnen').insert({
+    kavel_id: kavelId,
+    owner_id: ownerId,
+    termijn_key: termijnKey,
+    naam,
+    status: 'actief',
+    triggered_at: new Date().toISOString(),
+  })
+}
+
+export async function updateBetaling(id: string, updates: Partial<Betalingstermijn>): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('betalingstermijnen').update(updates).eq('id', id)
 }
 
 export async function deleteBetaling(id: string): Promise<void> {
   const supabase = createClient()
-  const { error } = await supabase
-    .from('betalingstermijnen')
-    .delete()
-    .eq('id', id)
-  if (error) throw error
+  await supabase.from('betalingstermijnen').delete().eq('id', id)
+}
+
+// ── Verkoop: kavel op verkocht zetten + eigenaar koppelen ─────
+export async function verkoopKavel(
+  kavelId: string,
+  ownerId: string,
+  parkId: string
+): Promise<void> {
+  const supabase = createClient()
+  // Mark as verkocht
+  await supabase.from('kavels').update({ verkocht: true, owner_id: ownerId }).eq('id', kavelId)
+  // Add to kavel_owners
+  await supabase.from('kavel_owners').upsert(
+    { kavel_id: kavelId, owner_id: ownerId, rol: 'eigenaar' },
+    { onConflict: 'kavel_id,owner_id' }
+  )
+  // Get termijn config for eerste_termijn
+  const { data: config } = await supabase
+    .from('termijn_config')
+    .select('*')
+    .eq('park_id', parkId)
+    .eq('termijn_key', 'eerste_termijn')
+    .single()
+  if (config) {
+    await triggerBetalingstermijn(kavelId, ownerId, 'eerste_termijn', config.naam)
+  }
 }

@@ -142,8 +142,8 @@ export function isActief(k: Kavel): boolean {
 }
 
 export const STATUS_LABELS: Record<string, string> = {
-  geplaatst:         'Geplaatst',
   bouw_gestart:      'Bouw gestart',
+  geplaatst:         'Geplaatst',
   aansloten:         'Aangesloten',
   tuin_aangelegd:    'Tuin aangelegd',
   meubels_geplaatst: 'Meubels geplaatst',

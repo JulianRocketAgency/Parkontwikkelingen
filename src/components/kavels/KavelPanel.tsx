@@ -54,22 +54,32 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
         })
         onUpdate(updated)
 
-        // Check if we need to trigger a betalingstermijn
+        // Trigger betalingstermijn als een relevant vinkje aangezet wordt
         if (changedStatusKey && updated.owner_id && updated.status) {
-          const trigger = TRIGGER_MAP[changedStatusKey]
-          if (trigger) {
-            const config = termijnConfig.find(t => t.trigger === trigger)
-            const statusVal = updated.status[changedStatusKey as keyof typeof updated.status]
-            if (config && statusVal === true) {
-              await triggerBetalingstermijn(updated.id, updated.owner_id, config.termijn_key, config.naam)
+          const statusVal = updated.status[changedStatusKey as keyof typeof updated.status]
+          if (statusVal === true) {
+            // Map status key to trigger key
+            const triggerMap: Record<string, string> = {
+              bouw_gestart:      'bouw_gestart',
+              geplaatst:         'geplaatst',
+              intern_opgeleverd: 'intern_opgeleverd',
+              opgeleverd:        'opgeleverd',
+            }
+            const triggerKey = triggerMap[changedStatusKey]
+            if (triggerKey) {
+              const config = termijnConfig.find(t => t.trigger === triggerKey && t.actief)
+              if (config) {
+                await triggerBetalingstermijn(updated.id, updated.owner_id, config.termijn_key, config.naam)
+              }
             }
           }
-          // Transport datum trigger
-          if (changedStatusKey === 'transport_date' && updated.transport_date && updated.owner_id) {
-            const config = termijnConfig.find(t => t.trigger === 'transport_datum')
-            if (config) {
-              await triggerBetalingstermijn(updated.id, updated.owner_id, config.termijn_key, config.naam)
-            }
+        }
+
+        // Transport datum trigger
+        if (changedStatusKey === 'transport_date' && updated.transport_date && updated.owner_id) {
+          const config = termijnConfig.find(t => t.trigger === 'transport_datum' && t.actief)
+          if (config) {
+            await triggerBetalingstermijn(updated.id, updated.owner_id, config.termijn_key, config.naam)
           }
         }
 
@@ -86,9 +96,11 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
   }
 
   function toggleStatus(key: string) {
+    if (!k.status) return
+    const currentVal = k.status[key as keyof typeof k.status]
     const updated = {
       ...k,
-      status: k.status ? { ...k.status, [key]: !k.status[key as keyof typeof k.status] } : k.status,
+      status: { ...k.status, [key]: !currentVal },
     }
     update(updated, key)
   }

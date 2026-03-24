@@ -249,7 +249,7 @@ export function EigenarenClient({ owners, kavels }: Props) {
                             return (
                               <div key={k.id} className="mb-1 last:mb-0">
                                 {currentTermijn ? (
-                                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e] inline-block">
+                                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e] whitespace-nowrap inline-block">
                                     {maxIdx + 1}/{TOTAL_TERMIJNEN} · {currentTermijn.naam}
                                   </span>
                                 ) : (

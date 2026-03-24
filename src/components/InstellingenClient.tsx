@@ -82,19 +82,13 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       imgRef.current = img
-      // Use a fixed large width — canvas will be constrained by CSS
-      const maxW = wrapRef.current?.clientWidth || 900
-      const maxH = 560
-      const scale = Math.min(maxW / img.width, maxH / img.height)
-      const w = Math.round(img.width * scale)
-      const h = Math.round(img.height * scale)
+      // Render at FULL resolution — CSS handles visual scaling
+      const w = img.naturalWidth
+      const h = img.naturalHeight
       const c = canvasRef.current
       if (c) {
         c.width = w
         c.height = h
-        // Let CSS scale it to fit the container
-        c.style.width = '100%'
-        c.style.height = 'auto'
         c.getContext('2d')!.drawImage(img, 0, 0, w, h)
       }
       setEditorW(w)
@@ -336,7 +330,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                     )}
                   </div>
                   <div ref={wrapRef} className={`relative bg-[#e8e8ed] rounded-2xl overflow-hidden w-full ${editingId ? 'cursor-crosshair' : 'cursor-default'}`}>
-                    <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'auto',maxHeight:'560px',objectFit:'contain'}} onClick={onCanvasClick}
+                    <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'auto',maxHeight:'600px'}} onClick={onCanvasClick}
                       onMouseMove={e => { if (editingId && currentPts.length > 0) { const r = e.currentTarget.getBoundingClientRect(); const scaleX = editorW/r.width; const scaleY = editorH/r.height; setHoverPx({x:(e.clientX-r.left)*scaleX,y:(e.clientY-r.top)*scaleY}) }}} />
                   </div>
                   {/* Kavel list below canvas */}

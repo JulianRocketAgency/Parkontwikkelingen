@@ -158,12 +158,7 @@ export function MapWidget({ park, kavels, highlightId, onKavelClick, mapUrl, tit
   )
 }
 
-function CanvasImage({ img, cw, ch }: { img: HTMLImageElement; cw: number; ch: number }) {
-  const ref = useRef<HTMLCanvasElement>(null)
-  useEffect(() => {
-    const c = ref.current; if (!c) return
-    c.width = cw; c.height = ch
-    c.getContext('2d')!.drawImage(img, 0, 0, cw, ch)
-  }, [img, cw, ch])
-  return <canvas ref={ref} style={{ position: 'absolute', left: 0, top: 0 }} />
+function CanvasImage({ img }: { img: HTMLImageElement; cw: number; ch: number }) {
+  return <img src={img.src} alt="plattegrond"
+    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', userSelect: 'none', pointerEvents: 'none' }} />
 }

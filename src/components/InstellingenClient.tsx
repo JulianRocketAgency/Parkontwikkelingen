@@ -82,17 +82,20 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       imgRef.current = img
-      // Render at FULL resolution — CSS handles visual scaling
-      const w = img.naturalWidth
-      const h = img.naturalHeight
+      const naturalW = img.naturalWidth
+      const naturalH = img.naturalHeight
       const c = canvasRef.current
       if (c) {
-        c.width = w
-        c.height = h
-        c.getContext('2d')!.drawImage(img, 0, 0, w, h)
+        // Render at full resolution for quality
+        c.width = naturalW
+        c.height = naturalH
+        c.getContext('2d')!.drawImage(img, 0, 0, naturalW, naturalH)
+        // CSS scales it down — remove any inline size overrides
+        c.style.width = ''
+        c.style.height = ''
       }
-      setEditorW(w)
-      setEditorH(h)
+      setEditorW(naturalW)
+      setEditorH(naturalH)
     }
     img.src = url
   }
@@ -329,8 +332,8 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                       </>
                     )}
                   </div>
-                  <div ref={wrapRef} className={`relative bg-[#e8e8ed] rounded-2xl overflow-hidden w-full ${editingId ? 'cursor-crosshair' : 'cursor-default'}`}>
-                    <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'auto',maxHeight:'600px'}} onClick={onCanvasClick}
+                  <div ref={wrapRef} className={`relative bg-[#e8e8ed] rounded-2xl overflow-hidden w-full ${editingId ? 'cursor-crosshair' : 'cursor-default'}`} style={{height: '560px'}}>
+                    <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'100%',objectFit:'contain'}} onClick={onCanvasClick}
                       onMouseMove={e => { if (editingId && currentPts.length > 0) { const r = e.currentTarget.getBoundingClientRect(); const scaleX = editorW/r.width; const scaleY = editorH/r.height; setHoverPx({x:(e.clientX-r.left)*scaleX,y:(e.clientY-r.top)*scaleY}) }}} />
                   </div>
                   {/* Kavel list below canvas */}

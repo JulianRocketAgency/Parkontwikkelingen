@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { MapWidget } from '@/components/map/MapWidget'
 import type { Kavel } from '@/types'
 import { isOpgeleverd, isActief, getKavelPct, OPTIES, getOptie } from '@/types'
 import { ChevronRight } from 'lucide-react'
@@ -9,9 +10,10 @@ interface Props {
   kavels: Kavel[]
   selectedId: string | null
   onSelect: (id: string) => void
+  mapUrl: string | null
 }
 
-export function PhaseBlock({ fase, kavels, selectedId, onSelect }: Props) {
+export function PhaseBlock({ fase, kavels, selectedId, onSelect, mapUrl }: Props) {
   const [open, setOpen] = useState(fase === 1)
 
   const pct = Math.round(kavels.reduce((s, k) => s + getKavelPct(k.status), 0) / kavels.length)
@@ -51,10 +53,24 @@ export function PhaseBlock({ fase, kavels, selectedId, onSelect }: Props) {
       </div>
 
       {open && (
-        <div className="px-4 pb-4 grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2">
-          {kavels.map(k => (
-            <KavelCard key={k.id} kavel={k} selected={selectedId === k.id} onSelect={onSelect} />
-          ))}
+        <div className="px-4 pb-4">
+          {mapUrl && (
+            <div className="mb-4">
+              <MapWidget
+                park={null}
+                kavels={kavels}
+                highlightId={selectedId}
+                onKavelClick={onSelect}
+                mapUrl={mapUrl}
+                title={`Plattegrond fase ${fase}`}
+              />
+            </div>
+          )}
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2">
+            {kavels.map(k => (
+              <KavelCard key={k.id} kavel={k} selected={selectedId === k.id} onSelect={onSelect} />
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -172,3 +172,47 @@ export async function uploadMapImage(parkId: string, file: File): Promise<string
   await supabase.from('parks').update({ map_image: publicUrl }).eq('id', parkId)
   return publicUrl
 }
+
+// ── Park maps (per fase) ──────────────────────────────────────
+export interface ParkMap {
+  id: string
+  park_id: string
+  fase: number | null
+  map_url: string
+}
+
+export async function getParkMaps(parkId: string): Promise<ParkMap[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('park_maps')
+    .select('*')
+    .eq('park_id', parkId)
+  if (error) { console.error('getParkMaps:', error); return [] }
+  return data ?? []
+}
+
+export async function upsertParkMap(parkId: string, fase: number | null, file: File): Promise<string> {
+  const supabase = createClient()
+  const faseStr = fase === null ? 'overall' : `fase-${fase}`
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png'
+  const path = `${parkId}/${faseStr}.${ext}`
+  const { error: uploadError } = await supabase.storage
+    .from('park-maps')
+    .upload(path, file, { upsert: true })
+  if (uploadError) throw uploadError
+  const { data: { publicUrl } } = supabase.storage.from('park-maps').getPublicUrl(path)
+  await supabase.from('park_maps').upsert(
+    { park_id: parkId, fase, map_url: publicUrl },
+    { onConflict: 'park_id,fase' }
+  )
+  if (fase === null) {
+    await supabase.from('parks').update({ map_image: publicUrl }).eq('id', parkId)
+  }
+  return publicUrl
+}
+
+export async function deleteParkMap(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('park_maps').delete().eq('id', id)
+  if (error) throw error
+}

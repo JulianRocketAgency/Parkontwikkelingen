@@ -1,11 +1,11 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { Kavel, Park } from '@/types'
 import { isOpgeleverd, isActief, getKavelPct } from '@/types'
 import { PhaseBlock } from './PhaseBlock'
 import { KavelPanel } from './KavelPanel'
 import { MapWidget } from '@/components/map/MapWidget'
-import { createKavel } from '@/lib/queries'
+import { createKavel, getParkMaps, type ParkMap } from '@/lib/queries'
 
 interface Props {
   park: Park | null
@@ -21,6 +21,9 @@ export function DashboardClient({ park, kavels: initial }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const [newKavel, setNewKavel] = useState({ number: '', fase: '1', type: 'Tiny 2p', uitvoering: 'Rechts' })
   const [adding, setAdding] = useState(false)
+  const [parkMaps, setParkMaps] = useState<ParkMap[]>([])
+
+  useEffect(() => { getParkMaps(PARK_ID).then(setParkMaps) }, [])
 
   const total = kavels.length
   const opl = kavels.filter(isOpgeleverd).length
@@ -102,7 +105,8 @@ export function DashboardClient({ park, kavels: initial }: Props) {
           {fases.map(fase => (
             <PhaseBlock key={fase} fase={fase}
               kavels={kavels.filter(k => k.fase === fase)}
-              selectedId={selectedId} onSelect={selectKavel} />
+              selectedId={selectedId} onSelect={selectKavel}
+              mapUrl={parkMaps.find(m => m.fase === fase)?.map_url ?? null} />
           ))}
         </div>
         <div className="sticky top-7">

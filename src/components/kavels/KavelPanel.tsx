@@ -1,9 +1,9 @@
 'use client'
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { X, ChevronDown, Loader2 } from 'lucide-react'
 import type { Kavel } from '@/types'
 import { STATUS_LABELS, OPTIES, getOptie, getKavelPct } from '@/types'
-import { upsertKavelStatus, upsertKavelOpties, updateKavel } from '@/lib/queries'
+import { upsertKavelStatus, upsertKavelOpties, updateKavel, getDependencies, type Dependency } from '@/lib/queries'
 
 interface Props {
   kavel: Kavel
@@ -16,6 +16,11 @@ export function KavelPanel({ kavel, onClose, onUpdate }: Props) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [expandedOptie, setExpandedOptie] = useState<string | null>(null)
+  const [deps, setDeps] = useState<Dependency[]>([])
+
+  useEffect(() => {
+    getDependencies(kavel.park_id).then(setDeps)
+  }, [kavel.park_id])
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const pct = getKavelPct(k.status)
@@ -184,6 +189,40 @@ export function KavelPanel({ kavel, onClose, onUpdate }: Props) {
                       </button>
                     </div>
 
+                    {/* Dependency indicators */}
+                    {(() => {
+                      const vereist = deps.filter(d => d.type === 'optie_optie' && d.trigger_key === key)
+                      const vereistDoor = deps.filter(d => d.type === 'optie_optie' && d.requires_key === key)
+                      const geblokkeerd = deps.filter(d => d.type === 'status_optie' && d.requires_key === key)
+                        .filter(d => k.status && !k.status[d.trigger_key as keyof typeof k.status])
+                      const vrijgegeven = deps.filter(d => d.type === 'status_optie' && d.requires_key === key)
+                        .filter(d => k.status && k.status[d.trigger_key as keyof typeof k.status])
+                      if (!vereist.length && !vereistDoor.length && !geblokkeerd.length && !vrijgegeven.length) return null
+                      return (
+                        <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+                          {geblokkeerd.map(d => (
+                            <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,59,48,0.10)] text-[#8b1a1a]">
+                              ⊘ Wacht op: {STATUS_LABELS[d.trigger_key] ?? d.trigger_key}
+                            </span>
+                          ))}
+                          {vrijgegeven.map(d => (
+                            <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.12)] text-[#1a7a32]">
+                              ✓ Vrijgegeven na: {STATUS_LABELS[d.trigger_key] ?? d.trigger_key}
+                            </span>
+                          ))}
+                          {vereist.map(d => (
+                            <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.12)] text-[#a05a00]">
+                              → Vereist ook: {OPTIES.find(o=>o.key===d.requires_key)?.label ?? d.requires_key}
+                            </span>
+                          ))}
+                          {vereistDoor.map(d => (
+                            <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">
+                              ← Vereist door: {OPTIES.find(o=>o.key===d.trigger_key)?.label ?? d.trigger_key}
+                            </span>
+                          ))}
+                        </div>
+                      )
+                    })()}
                     {isOpen && (
                       <div className="px-3 pb-3 border-t border-black/[0.05]">
                         <textarea

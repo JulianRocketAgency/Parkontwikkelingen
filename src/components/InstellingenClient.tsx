@@ -153,7 +153,9 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     const py = (e.clientY - r.top) / r.height * editorH
     if (currentPts.length >= 3) {
       const fp = currentPts[0]
-      if (Math.hypot(px - fp.x/100*editorW, py - fp.y/100*editorH) < 20) { closePoly(); return }
+      // Threshold scales with zoom — easier to close at low zoom levels
+      const threshold = Math.max(20, 40 / editorZoom)
+      if (Math.hypot(px - fp.x/100*editorW, py - fp.y/100*editorH) < threshold) { closePoly(); return }
     }
     setCurrentPts(prev => [...prev, { x: px/editorW*100, y: py/editorH*100 }])
   }

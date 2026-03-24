@@ -79,14 +79,26 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       imgRef.current = img
-      const maxW = wrapRef.current?.clientWidth || 700
-      const scale = Math.min(maxW / img.width, 520 / img.height, 1)
-      const w = Math.round(img.width * scale), h = Math.round(img.height * scale)
-      setEditorW(w); setEditorH(h)
-      const c = canvasRef.current!
-      c.width = w; c.height = h
-      c.style.width = w + 'px'; c.style.height = h + 'px'
-      redraw()
+      // Wait for DOM to be ready before measuring
+      requestAnimationFrame(() => {
+        const wrap = wrapRef.current
+        if (!wrap) return
+        const maxW = wrap.clientWidth || 700
+        const maxH = 520
+        const scale = Math.min(maxW / img.width, maxH / img.height)
+        const w = Math.round(img.width * scale)
+        const h = Math.round(img.height * scale)
+        setEditorW(w)
+        setEditorH(h)
+        const c = canvasRef.current
+        if (!c) return
+        c.width = w
+        c.height = h
+        c.style.width = w + 'px'
+        c.style.height = h + 'px'
+        const ctx = c.getContext('2d')!
+        ctx.drawImage(img, 0, 0, w, h)
+      })
     }
     img.src = url
   }
@@ -321,7 +333,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                     )}
                   </div>
                   <div className="grid grid-cols-[1fr_160px] gap-3">
-                    <div ref={wrapRef} className={`relative bg-[#e8e8ed] rounded-2xl overflow-hidden ${editingId ? 'cursor-crosshair' : 'cursor-default'}`}>
+                    <div ref={wrapRef} className={`relative bg-[#e8e8ed] rounded-2xl overflow-hidden w-full ${editingId ? 'cursor-crosshair' : 'cursor-default'}`} style={{minHeight: 300}}>
                       <canvas ref={canvasRef} onClick={onCanvasClick}
                         onMouseMove={e => { if (editingId && currentPts.length > 0) { const r = e.currentTarget.getBoundingClientRect(); setHoverPx({x:e.clientX-r.left,y:e.clientY-r.top}) }}} />
                     </div>

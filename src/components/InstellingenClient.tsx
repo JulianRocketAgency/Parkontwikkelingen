@@ -1,11 +1,13 @@
 'use client'
 import { useRef, useState, useEffect } from 'react'
 import type { Park, Kavel } from '@/types'
-import { isOpgeleverd, isActief } from '@/types'
-import { uploadMapImage, updateKavelPolygon } from '@/lib/queries'
+import { isOpgeleverd, isActief, OPTIES, STATUS_LABELS } from '@/types'
+import { uploadMapImage, updateKavelPolygon, getDependencies, createDependency, deleteDependency, type Dependency } from '@/lib/queries'
 
 interface Props { park: Park | null; kavels: Kavel[] }
 type Pt = { x: number; y: number }
+
+const PARK_ID = '11111111-0000-0000-0000-000000000001'
 
 export function InstellingenClient({ park, kavels: initial }: Props) {
   const [kavels, setKavels] = useState(initial)
@@ -17,9 +19,16 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
   const [editorH, setEditorH] = useState(1)
   const [uploading, setUploading] = useState(false)
   const [toast, setToast] = useState('')
+  const [deps, setDeps] = useState<Dependency[]>([])
+  const [newOO, setNewOO] = useState({ trigger: '', requires: '' })
+  const [newSO, setNewSO] = useState({ trigger: '', requires: '' })
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
+
+  useEffect(() => {
+    getDependencies(PARK_ID).then(setDeps)
+  }, [])
 
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 2200); return () => clearTimeout(t) } }, [toast])
 
@@ -112,17 +121,39 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     } catch { setToast('Upload mislukt') } finally { setUploading(false) }
   }
 
-  const Toggle = ({ on }: { on: boolean }) => (
-    <div onClick={() => {}} className={`w-9 h-5 rounded-full cursor-pointer transition-colors relative flex-shrink-0 ${on ? 'bg-[#0071e3]' : 'bg-[#e8e8ed]'}`}>
-      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
-    </div>
-  )
+  async function addDep(type: 'optie_optie' | 'status_optie', trigger: string, requires: string) {
+    if (!trigger || !requires) return
+    const dep = { park_id: PARK_ID, type, trigger_key: trigger, requires_key: requires }
+    await createDependency(dep)
+    setDeps(prev => [...prev, { ...dep, id: Date.now().toString() }])
+    if (type === 'optie_optie') setNewOO({ trigger: '', requires: '' })
+    else setNewSO({ trigger: '', requires: '' })
+    setToast('Regel toegevoegd ✓')
+  }
+
+  async function removeDep(id: string) {
+    await deleteDependency(id)
+    setDeps(prev => prev.filter(d => d.id !== id))
+  }
+
+  const optieOptions = OPTIES.map(o => ({ key: o.key, label: o.label }))
+  const statusOptions = Object.entries(STATUS_LABELS).map(([key, label]) => ({ key, label }))
+  const ooDeps = deps.filter(d => d.type === 'optie_optie')
+  const soDeps = deps.filter(d => d.type === 'status_optie')
+
+  const Chip = ({ label, color }: { label: string; color: 'blue' | 'green' | 'amber' }) => {
+    const styles = {
+      blue: 'bg-[rgba(0,113,227,0.10)] text-[#004f9e]',
+      green: 'bg-[rgba(48,209,88,0.13)] text-[#1a7a32]',
+      amber: 'bg-[rgba(255,159,10,0.12)] text-[#a05a00]',
+    }
+    return <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap ${styles[color]}`}>{label}</span>
+  }
 
   return (
     <div className="p-7 max-w-[1280px]">
-      {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[rgba(29,29,31,0.9)] backdrop-blur-xl text-white px-5 py-2.5 rounded-full text-[13px] font-medium z-50 shadow-lg">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[rgba(29,29,31,0.9)] backdrop-blur-xl text-white px-5 py-2.5 rounded-full text-[13px] font-medium z-50">
           {toast}
         </div>
       )}
@@ -134,11 +165,10 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
 
       <div className="flex flex-col gap-4">
 
-        {/* Plattegrond — full width */}
+        {/* Plattegrond */}
         <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
           <div className="text-[15px] font-semibold mb-1">Plattegrond & kavelindeling</div>
-          <div className="text-[13px] text-[#6e6e73] mb-5">Upload de plattegrond en teken per kavel een gebied. Klik punten om de omtrek te tekenen — sluit af door op het eerste punt (○) te klikken.</div>
-
+          <div className="text-[13px] text-[#6e6e73] mb-5">Upload de plattegrond en teken per kavel een gebied. Sluit af door op het eerste punt te klikken.</div>
           <div className="grid grid-cols-[1fr_200px] gap-5">
             <div>
               {!mapUrl ? (
@@ -151,25 +181,24 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
               ) : (
                 <div>
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <span className="text-[12px] text-[#6e6e73] flex-1" id="editorHint">
+                    <span className="text-[12px] text-[#6e6e73] flex-1">
                       {editingId ? `Kavel #${kavels.find(k=>k.id===editingId)?.number} — klik punten, sluit op het startpunt` : 'Selecteer een kavel om te tekenen'}
                     </span>
                     {currentPts.length > 0 && (
                       <>
-                        <button onClick={() => setCurrentPts(p => p.slice(0,-1))} className="px-2.5 py-1 rounded-lg text-[12px] bg-black/[0.06] text-[#3a3a3c] hover:bg-black/10">↩ Undo</button>
-                        <button onClick={() => { setCurrentPts([]); setEditingId(null) }} className="px-2.5 py-1 rounded-lg text-[12px] bg-black/[0.06] text-[#3a3a3c] hover:bg-black/10">Annuleren</button>
+                        <button onClick={() => setCurrentPts(p => p.slice(0,-1))} className="px-2.5 py-1 rounded-lg text-[12px] bg-black/[0.06] hover:bg-black/10">↩ Undo</button>
+                        <button onClick={() => { setCurrentPts([]); setEditingId(null) }} className="px-2.5 py-1 rounded-lg text-[12px] bg-black/[0.06] hover:bg-black/10">Annuleren</button>
                       </>
                     )}
-                    <button onClick={() => { setMapUrl(null); setKavels(prev => prev.map(k => ({...k, polygon: null}))) }} className="px-3 py-1 rounded-full text-[12px] bg-black/[0.06] text-[#3a3a3c] hover:bg-black/10">Verwijderen</button>
+                    <button onClick={() => { setMapUrl(null); setKavels(prev => prev.map(k => ({...k, polygon: null}))) }} className="px-3 py-1 rounded-full text-[12px] bg-black/[0.06] hover:bg-black/10">Verwijderen</button>
                   </div>
                   <div ref={wrapRef} className={`relative bg-[#e8e8ed] rounded-2xl overflow-hidden ${editingId ? 'cursor-crosshair' : 'cursor-default'}`}>
-                    <canvas ref={canvasRef} onClick={onCanvasClick} onMouseMove={e => { if (editingId && currentPts.length > 0) { const r = e.currentTarget.getBoundingClientRect(); setHoverPx({x:e.clientX-r.left,y:e.clientY-r.top}) }}} />
+                    <canvas ref={canvasRef} onClick={onCanvasClick}
+                      onMouseMove={e => { if (editingId && currentPts.length > 0) { const r = e.currentTarget.getBoundingClientRect(); setHoverPx({x:e.clientX-r.left,y:e.clientY-r.top}) }}} />
                   </div>
                 </div>
               )}
             </div>
-
-            {/* Kavel list */}
             <div>
               <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-2">Kavels</div>
               <div className="flex flex-col gap-1 max-h-[440px] overflow-y-auto">
@@ -194,9 +223,94 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
           </div>
         </div>
 
+        {/* Afhankelijkheden */}
+        <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
+          <div className="text-[15px] font-semibold mb-1">Afhankelijkheden</div>
+          <div className="text-[13px] text-[#6e6e73] mb-5">Stel in welke opties samenhangen en wanneer opties beschikbaar worden op basis van bouwvoortgang.</div>
+
+          <div className="grid grid-cols-2 gap-6">
+            {/* Optie → Optie */}
+            <div>
+              <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.07em] mb-3 pb-2 border-b border-black/[0.05]">
+                Optie vereist optie
+              </div>
+              <div className="text-[12px] text-[#6e6e73] mb-3">Als optie A besteld wordt, is optie B automatisch vereist</div>
+              <div className="flex flex-col gap-2 mb-4">
+                {ooDeps.length === 0 && (
+                  <div className="text-[12px] text-[#aeaeb2] py-2">Nog geen regels ingesteld</div>
+                )}
+                {ooDeps.map(d => (
+                  <div key={d.id} className="flex items-center gap-2 px-3 py-2.5 bg-[#f5f5f7] rounded-[10px] border border-black/[0.05]">
+                    <Chip label={optieOptions.find(o=>o.key===d.trigger_key)?.label ?? d.trigger_key} color="blue" />
+                    <span className="text-[11px] text-[#aeaeb2]">→ vereist</span>
+                    <Chip label={optieOptions.find(o=>o.key===d.requires_key)?.label ?? d.requires_key} color="amber" />
+                    <button onClick={() => removeDep(d.id)} className="ml-auto text-[#aeaeb2] hover:text-[#ff3b30] transition-all text-[16px] leading-none">×</button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 items-center">
+                <select value={newOO.trigger} onChange={e => setNewOO(p => ({...p, trigger: e.target.value}))}
+                  className="flex-1 bg-[#f5f5f7] border border-black/[0.05] rounded-[8px] px-2.5 py-2 text-[12px] outline-none focus:border-[#0071e3] transition-all">
+                  <option value="">Als... (optie)</option>
+                  {optieOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                </select>
+                <span className="text-[11px] text-[#aeaeb2] flex-shrink-0">→</span>
+                <select value={newOO.requires} onChange={e => setNewOO(p => ({...p, requires: e.target.value}))}
+                  className="flex-1 bg-[#f5f5f7] border border-black/[0.05] rounded-[8px] px-2.5 py-2 text-[12px] outline-none focus:border-[#0071e3] transition-all">
+                  <option value="">Dan... (optie)</option>
+                  {optieOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                </select>
+                <button onClick={() => addDep('optie_optie', newOO.trigger, newOO.requires)}
+                  disabled={!newOO.trigger || !newOO.requires}
+                  className="px-3 py-2 rounded-full bg-[#0071e3] text-white text-[12px] font-medium hover:bg-[#0077ed] transition-all disabled:opacity-40 flex-shrink-0">
+                  + Voeg toe
+                </button>
+              </div>
+            </div>
+
+            {/* Status → Optie */}
+            <div>
+              <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.07em] mb-3 pb-2 border-b border-black/[0.05]">
+                Bouwstatus vrijgeeft optie
+              </div>
+              <div className="text-[12px] text-[#6e6e73] mb-3">Een optie kan pas worden uitgevoerd als een bouwstap gereed is</div>
+              <div className="flex flex-col gap-2 mb-4">
+                {soDeps.length === 0 && (
+                  <div className="text-[12px] text-[#aeaeb2] py-2">Nog geen regels ingesteld</div>
+                )}
+                {soDeps.map(d => (
+                  <div key={d.id} className="flex items-center gap-2 px-3 py-2.5 bg-[#f5f5f7] rounded-[10px] border border-black/[0.05]">
+                    <Chip label={statusOptions.find(o=>o.key===d.trigger_key)?.label ?? d.trigger_key} color="green" />
+                    <span className="text-[11px] text-[#aeaeb2]">→ vrijgeeft</span>
+                    <Chip label={optieOptions.find(o=>o.key===d.requires_key)?.label ?? d.requires_key} color="blue" />
+                    <button onClick={() => removeDep(d.id)} className="ml-auto text-[#aeaeb2] hover:text-[#ff3b30] transition-all text-[16px] leading-none">×</button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 items-center">
+                <select value={newSO.trigger} onChange={e => setNewSO(p => ({...p, trigger: e.target.value}))}
+                  className="flex-1 bg-[#f5f5f7] border border-black/[0.05] rounded-[8px] px-2.5 py-2 text-[12px] outline-none focus:border-[#0071e3] transition-all">
+                  <option value="">Als... (status)</option>
+                  {statusOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                </select>
+                <span className="text-[11px] text-[#aeaeb2] flex-shrink-0">→</span>
+                <select value={newSO.requires} onChange={e => setNewSO(p => ({...p, requires: e.target.value}))}
+                  className="flex-1 bg-[#f5f5f7] border border-black/[0.05] rounded-[8px] px-2.5 py-2 text-[12px] outline-none focus:border-[#0071e3] transition-all">
+                  <option value="">Dan... (optie)</option>
+                  {optieOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                </select>
+                <button onClick={() => addDep('status_optie', newSO.trigger, newSO.requires)}
+                  disabled={!newSO.trigger || !newSO.requires}
+                  className="px-3 py-2 rounded-full bg-[#0071e3] text-white text-[12px] font-medium hover:bg-[#0077ed] transition-all disabled:opacity-40 flex-shrink-0">
+                  + Voeg toe
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Bottom two-col */}
         <div className="grid grid-cols-2 gap-4">
-          {/* Parkgegevens */}
           <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
             <div className="text-[15px] font-semibold mb-1">Parkgegevens</div>
             <div className="text-[13px] text-[#6e6e73] mb-5">Algemene informatie over dit park.</div>
@@ -216,8 +330,6 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
             </div>
             <button onClick={() => setToast('Opgeslagen ✓')} className="px-5 py-2 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] transition-all">Opslaan</button>
           </div>
-
-          {/* Gebruikers & Notificaties */}
           <div className="flex flex-col gap-4">
             <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
               <div className="text-[15px] font-semibold mb-1">Gebruikers & rollen</div>
@@ -244,7 +356,10 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
               {[['Bij statuswijziging kavel', true],['Bij oplevering woning', true],['Nieuwe eigenaar gekoppeld', false],['Weekrapportage', true]].map(([label, on]) => (
                 <div key={String(label)} className="flex items-center justify-between py-2.5 border-b border-black/[0.05] last:border-0">
                   <span className="text-[13px]">{label as string}</span>
-                  <Toggle on={on as boolean} />
+                  <div onClick={e => { const el = e.currentTarget; el.classList.toggle('on'); setToast('Instelling gewijzigd') }}
+                    className={`w-9 h-5 rounded-full cursor-pointer transition-colors relative flex-shrink-0 ${on ? 'bg-[#0071e3] on' : 'bg-[#e8e8ed]'}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
+                  </div>
                 </div>
               ))}
             </div>

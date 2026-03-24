@@ -178,7 +178,7 @@ export function EigenarenClient({ owners, kavels }: Props) {
             <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  {['', 'Naam', 'Kavels', 'Bouwstatus', 'Betaling', ''].map((h, i) => (
+                  {['Eigenaar / Kavel', 'Status', 'Betaling', ''].map((h, i) => (
                     <th key={i} className="px-4 py-3 text-[11px] font-semibold text-[#6e6e73] uppercase tracking-[0.06em] text-left border-b border-black/[0.05] bg-[#f5f5f7]">{h}</th>
                   ))}
                 </tr>
@@ -188,32 +188,22 @@ export function EigenarenClient({ owners, kavels }: Props) {
                   const kv = kavels.filter(k => k.owner_id === o.id)
                   const sel = selectedId === o.id
                   const isLast = i === filtered.length - 1
-
                   return (
                     <React.Fragment key={o.id}>
                       {/* Owner header row */}
-                      <tr onClick={() => setSelectedId(o.id)}
-                        className={`cursor-pointer transition-all ${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : 'hover:[&>td]:bg-black/[0.02]'}`}>
-                        <td className="px-4 pt-3 pb-1" colSpan={5}>
+                      <tr onClick={() => setSelectedId(o.id)} className={`cursor-pointer transition-all ${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : 'hover:[&>td]:bg-black/[0.02]'}`}>
+                        <td className="px-4 pt-3 pb-2" colSpan={4}>
                           <div className="flex items-center gap-2.5">
-                            <div className="w-[28px] h-[28px] rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0"
-                              style={{ background: o.color }}>{initials(o.name)}</div>
-                            <div>
-                              <span className="text-[13px] font-semibold text-[#1d1d1f]">{o.name}</span>
-                              <span className="text-[12px] text-[#aeaeb2] ml-2">{o.email}</span>
-                            </div>
+                            <div className="w-[28px] h-[28px] rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0" style={{ background: o.color }}>{initials(o.name)}</div>
+                            <span className="text-[13px] font-semibold text-[#1d1d1f]">{o.name}</span>
+                            <span className="text-[12px] text-[#aeaeb2]">{o.email}</span>
                           </div>
                         </td>
-                        <td className="px-4 pt-3 pb-1 text-right text-[#aeaeb2] text-[12px]">→</td>
                       </tr>
                       {/* Per-kavel rows */}
                       {kv.length === 0 ? (
-                        <tr onClick={() => setSelectedId(o.id)}
-                          className={`cursor-pointer ${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : 'hover:[&>td]:bg-black/[0.02]'}
-                            ${!isLast ? '[&>td]:border-b [&>td]:border-black/[0.05]' : ''}`}>
-                          <td className="px-4 pt-1 pb-3 pl-14" colSpan={6}>
-                            <span className="text-[12px] text-[#aeaeb2]">Geen kavels gekoppeld</span>
-                          </td>
+                        <tr className={`${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : ''} ${!isLast ? '[&>td]:border-b [&>td]:border-black/[0.05]' : ''}`}>
+                          <td className="pl-14 pr-4 pb-3" colSpan={4}><span className="text-[12px] text-[#aeaeb2]">Geen kavels</span></td>
                         </tr>
                       ) : kv.map((k, ki) => {
                         const done = isOpgeleverd(k), active = isActief(k)
@@ -227,20 +217,22 @@ export function EigenarenClient({ owners, kavels }: Props) {
                               ${sel ? '[&>td]:bg-[rgba(0,113,227,0.06)]' : 'hover:[&>td]:bg-black/[0.02]'}
                               ${isKavelLast && !isLast ? '[&>td]:border-b [&>td]:border-black/[0.05]' : ''}
                               ${!isKavelLast ? '[&>td]:border-b [&>td]:border-black/[0.03]' : ''}`}>
-                            <td className="px-4 pt-1 pb-3 pl-14" colSpan={1}>
-                              <span className="text-[12px] font-medium text-[#6e6e73]">Kavel #{k.number}</span>
-                              <span className="text-[11px] text-[#aeaeb2] ml-1.5">{k.type}</span>
+                            {/* Kavel naam */}
+                            <td className="pl-14 pr-4 pb-3 pt-0">
+                              <span className="text-[12px] font-medium text-[#3a3a3c]">Kavel #{k.number}</span>
+                              <span className="text-[11px] text-[#aeaeb2] ml-1.5">{k.type} · {k.uitvoering}</span>
                             </td>
-                            <td className="px-4 pt-1 pb-3">
-                              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full
-                                ${done ? 'bg-[rgba(48,209,88,0.13)] text-[#1a7a32]'
-                                : active ? 'bg-[rgba(255,159,10,0.12)] text-[#a05a00]'
-                                : 'bg-black/[0.06] text-[#6e6e73]'}`}>
-                                {done ? 'Opgeleverd' : active ? 'In uitvoering' : 'Gepland'}
-                              </span>
-                              {k.verkocht && <span className="ml-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.13)] text-[#1a7a32]">Verkocht</span>}
+                            {/* Status */}
+                            <td className="px-4 pb-3 pt-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${done ? 'bg-[rgba(48,209,88,0.13)] text-[#1a7a32]' : active ? 'bg-[rgba(255,159,10,0.12)] text-[#a05a00]' : 'bg-black/[0.06] text-[#6e6e73]'}`}>
+                                  {done ? 'Opgeleverd' : active ? 'In uitvoering' : 'Gepland'}
+                                </span>
+                                {k.verkocht && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.13)] text-[#1a7a32]">Verkocht</span>}
+                              </div>
                             </td>
-                            <td className="px-4 pt-1 pb-3" colSpan={3}>
+                            {/* Betaling */}
+                            <td className="px-4 pb-3 pt-0">
                               {currentTermijn ? (
                                 <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">
                                   {maxIdx + 1}/{TOTAL_TERMIJNEN} · {currentTermijn.naam}
@@ -249,6 +241,8 @@ export function EigenarenClient({ owners, kavels }: Props) {
                                 <span className="text-[11px] text-[#aeaeb2]">0/{TOTAL_TERMIJNEN}</span>
                               )}
                             </td>
+                            {/* Arrow */}
+                            <td className="px-4 pb-3 pt-0 text-right text-[#aeaeb2] text-[12px]">→</td>
                           </tr>
                         )
                       })}

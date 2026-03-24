@@ -268,3 +268,66 @@ export async function upsertKavelPolygonForMap(
     .upsert({ kavel_id: kavelId, map_id: mapId, polygon }, { onConflict: 'kavel_id,map_id' })
   if (error) throw error
 }
+
+// ── Betalingstermijnen ────────────────────────────────────────
+export interface Betalingstermijn {
+  id: string
+  owner_id: string
+  omschrijving: string
+  bedrag: number
+  vervaldatum: string
+  status: 'openstaand' | 'betaald' | 'te_laat' | 'deelbetaling'
+  notitie: string | null
+  created_at: string
+}
+
+export async function getBetalingen(parkId: string): Promise<Betalingstermijn[]> {
+  const supabase = createClient()
+  const ownerIds = await supabase
+    .from('owners')
+    .select('id')
+    .eq('park_id', parkId)
+  if (ownerIds.error || !ownerIds.data) return []
+  const ids = ownerIds.data.map(o => o.id)
+  const { data, error } = await supabase
+    .from('betalingstermijnen')
+    .select('*')
+    .in('owner_id', ids)
+    .order('vervaldatum', { ascending: true })
+  if (error) { console.error('getBetalingen:', error); return [] }
+  return data ?? []
+}
+
+export async function upsertBetaling(
+  b: Omit<Betalingstermijn, 'id' | 'created_at'>
+): Promise<Betalingstermijn | null> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('betalingstermijnen')
+    .insert(b)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateBetaling(
+  id: string,
+  updates: Partial<Omit<Betalingstermijn, 'id' | 'created_at'>>
+): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('betalingstermijnen')
+    .update(updates)
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteBetaling(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('betalingstermijnen')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}

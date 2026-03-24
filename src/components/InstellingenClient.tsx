@@ -43,6 +43,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
   const [editorW, setEditorW] = useState(1)
   const [editorH, setEditorH] = useState(1)
   const [uploading, setUploading] = useState<string | null>(null)
+  const [editorZoom, setEditorZoom] = useState(1)
   const [toast, setToast] = useState('')
   const [deps, setDeps] = useState<Dependency[]>([])
   const [parkMaps, setParkMaps] = useState<ParkMap[]>([])
@@ -75,6 +76,7 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     setEditingFase(fase)
     setEditingId(null)
     setCurrentPts([])
+    setEditorZoom(1)
     imgRef.current = null
     setEditorW(1)
     setEditorH(1)
@@ -82,20 +84,8 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       imgRef.current = img
-      const naturalW = img.naturalWidth
-      const naturalH = img.naturalHeight
-      const c = canvasRef.current
-      if (c) {
-        // Render at full resolution for quality
-        c.width = naturalW
-        c.height = naturalH
-        c.getContext('2d')!.drawImage(img, 0, 0, naturalW, naturalH)
-        // CSS scales it down — remove any inline size overrides
-        c.style.width = ''
-        c.style.height = ''
-      }
-      setEditorW(naturalW)
-      setEditorH(naturalH)
+      setEditorW(img.naturalWidth)
+      setEditorH(img.naturalHeight)
     }
     img.src = url
   }
@@ -143,18 +133,16 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
     }
   }
 
-  function onCanvasClick(e: React.MouseEvent<HTMLCanvasElement>) {
+  function onCanvasClick(e: React.MouseEvent<SVGSVGElement>) {
     if (!editingId) return
     const r = e.currentTarget.getBoundingClientRect()
-    // Use displayed size (CSS) not intrinsic canvas size
-    const displayW = r.width
-    const displayH = r.height
-    const px = e.clientX - r.left, py = e.clientY - r.top
+    const px = (e.clientX - r.left) / editorZoom
+    const py = (e.clientY - r.top) / editorZoom
     if (currentPts.length >= 3) {
       const fp = currentPts[0]
-      if (Math.hypot(px - fp.x/100*displayW, py - fp.y/100*displayH) < 14) { closePoly(); return }
+      if (Math.hypot(px - fp.x/100*editorW, py - fp.y/100*editorH) < 14) { closePoly(); return }
     }
-    setCurrentPts(prev => [...prev, { x: px/displayW*100, y: py/displayH*100 }])
+    setCurrentPts(prev => [...prev, { x: px/editorW*100, y: py/editorH*100 }])
   }
 
   async function closePoly() {
@@ -332,9 +320,71 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                       </>
                     )}
                   </div>
-                  <div ref={wrapRef} className={`relative bg-[#e8e8ed] rounded-2xl overflow-hidden w-full ${editingId ? 'cursor-crosshair' : 'cursor-default'}`} style={{height: '560px'}}>
-                    <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'100%',objectFit:'contain'}} onClick={onCanvasClick}
-                      onMouseMove={e => { if (editingId && currentPts.length > 0) { const r = e.currentTarget.getBoundingClientRect(); const scaleX = editorW/r.width; const scaleY = editorH/r.height; setHoverPx({x:(e.clientX-r.left)*scaleX,y:(e.clientY-r.top)*scaleY}) }}} />
+                  {/* Scrollable container */}
+                  <div ref={wrapRef} className="relative bg-[#e8e8ed] rounded-2xl overflow-auto" style={{maxHeight: '560px'}}>
+                    <div style={{
+                      position: 'relative',
+                      width: editorW * editorZoom,
+                      height: editorH * editorZoom,
+                      minWidth: '100%',
+                    }}>
+                      {imgRef.current && (
+                        <img src={imgRef.current.src} alt="plattegrond"
+                          style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'fill',userSelect:'none',pointerEvents:'none'}} />
+                      )}
+                      <svg
+                        style={{position:'absolute',inset:0,width:'100%',height:'100%',cursor: editingId ? 'crosshair' : 'default'}}
+                        viewBox={`0 0 ${editorW} ${editorH}`}
+                        preserveAspectRatio="none"
+                        onClick={onCanvasClick}
+                        onMouseMove={e => {
+                          if (!editingId || currentPts.length === 0) return
+                          const r = e.currentTarget.getBoundingClientRect()
+                          setHoverPx({
+                            x: (e.clientX - r.left) / editorZoom / (r.width / editorW / editorZoom),
+                            y: (e.clientY - r.top) / editorZoom / (r.height / editorH / editorZoom),
+                          })
+                        }}
+                      >
+                        {faseKavelsForEditor.map(k => {
+                          if (!k.polygon || k.polygon.length < 3) return null
+                          const done = isOpgeleverd(k), active = isActief(k)
+                          const pts = k.polygon.map(p => `${p.x/100*editorW},${p.y/100*editorH}`).join(' ')
+                          const cx = k.polygon.reduce((s,p)=>s+p.x,0)/k.polygon.length/100*editorW
+                          const cy = k.polygon.reduce((s,p)=>s+p.y,0)/k.polygon.length/100*editorH
+                          return (
+                            <g key={k.id}>
+                              <polygon points={pts}
+                                fill={done?'rgba(48,209,88,.22)':active?'rgba(255,159,10,.22)':'rgba(0,113,227,.18)'}
+                                stroke={done?'#30d158':active?'#ff9f0a':'#0071e3'}
+                                strokeWidth={2} />
+                              <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
+                                fontSize={14} fontWeight="bold" fill="rgba(0,0,0,.7)"
+                                fontFamily="-apple-system,sans-serif">#{k.number}</text>
+                            </g>
+                          )
+                        })}
+                        {currentPts.length > 0 && (
+                          <g>
+                            <polyline
+                              points={[
+                                ...currentPts.map(p => `${p.x/100*editorW},${p.y/100*editorH}`),
+                                ...(hoverPx ? [`${hoverPx.x},${hoverPx.y}`] : [])
+                              ].join(' ')}
+                              fill="none" stroke="#0071e3" strokeWidth={2} strokeDasharray="5,4" />
+                            {currentPts.map((p, i) => {
+                              const px = p.x/100*editorW, py = p.y/100*editorH
+                              return (
+                                <g key={i}>
+                                  {i === 0 && <circle cx={px} cy={py} r={14} fill="none" stroke="rgba(0,113,227,.35)" strokeWidth={1.5} />}
+                                  <circle cx={px} cy={py} r={i===0?6:4} fill={i===0?'#fff':'#0071e3'} stroke="#0071e3" strokeWidth={2} />
+                                </g>
+                              )
+                            })}
+                          </g>
+                        )}
+                      </svg>
+                    </div>
                   </div>
                   {/* Kavel list below canvas */}
                   <div className="mt-3">

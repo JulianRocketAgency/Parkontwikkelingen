@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+* { box-sizing: border-box; }
+
+body {
+  -webkit-font-smoothing: antialiased;
+  font-family: -apple-system, 'Helvetica Neue', sans-serif;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d1d6; border-radius: 10px; }
+
+@keyframes slide-in-from-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.animate-in { animation-fill-mode: both; }
+.slide-in-from-right { animation-name: slide-in-from-right; }
+.duration-300 { animation-duration: 300ms; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fade-up 0.2s ease both; }

@@ -114,9 +114,9 @@ export const OPTIES: { key: string; label: string }[] = [
 export function getOptie(opties: KavelOpties | null | undefined, key: string): OptieEntry {
   if (!opties) return { besteld: false, gereed: false, notitie: '' }
   return {
-    besteld:  (opties as Record<string, unknown>)[`${key}_besteld`] as boolean ?? false,
-    gereed:   (opties as Record<string, unknown>)[`${key}_gereed`] as boolean ?? false,
-    notitie:  ((opties as Record<string, unknown>)[`${key}_notitie`] as string | null) ?? '',
+    besteld:  (opties as unknown as Record<string, unknown>)[`${key}_besteld`] as boolean ?? false,
+    gereed:   (opties as unknown as Record<string, unknown>)[`${key}_gereed`] as boolean ?? false,
+    notitie:  ((opties as unknown as Record<string, unknown>)[`${key}_notitie`] as string | null) ?? '',
   }
 }
 

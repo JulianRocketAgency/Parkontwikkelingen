@@ -22,10 +22,13 @@ async function pdfToImageUrl(file: File): Promise<string> {
   const scale = 3
   const viewport = page.getViewport({ scale })
   const canvas = document.createElement('canvas')
-  canvas.width = viewport.width
-  canvas.height = viewport.height
+  canvas.style.display = 'none'
+  canvas.width = Math.floor(viewport.width)
+  canvas.height = Math.floor(viewport.height)
   document.body.appendChild(canvas)
-  await page.render({ canvas, canvasContext: canvas.getContext('2d')!, viewport }).promise
+  const ctx = canvas.getContext('2d')
+  if (!ctx) { document.body.removeChild(canvas); throw new Error('Canvas context unavailable') }
+  await page.render({ canvas, canvasContext: ctx, viewport }).promise
   const url = canvas.toDataURL('image/png')
   document.body.removeChild(canvas)
   return url
@@ -177,7 +180,9 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
       url = await upsertParkMap(PARK_ID, fase, uploadFile)
       const freshMaps = await getParkMaps(PARK_ID)
       setParkMaps(freshMaps)
-      loadMapIntoEditor(url, fase)
+      // Cache buster zodat de nieuwe afbeelding geladen wordt
+      const cacheBustedUrl = url + '?t=' + Date.now()
+      loadMapIntoEditor(cacheBustedUrl, fase)
       setToast('Plattegrond geüpload ✓')
     } catch (err) {
       console.error(err)

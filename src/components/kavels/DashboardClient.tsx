@@ -35,6 +35,24 @@ export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen
   const [verkoopSaving, setVerkoopSaving] = useState(false)
   const [newKavel, setNewKavel] = useState({ number: '', fase: '1', type: 'Tiny 2p', uitvoering: 'Rechts' })
   const [adding, setAdding] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(true)
+  const [filters, setFilters] = useState<{
+    search: string
+    fases: number[]
+    status: string[]
+    verkoop: string[]
+    voortgang: string[]
+    opties: string[]
+    termijn: string[]
+  }>({
+    search: '',
+    fases: [],
+    status: [],
+    verkoop: [],
+    voortgang: [],
+    opties: [],
+    termijn: [],
+  })
 
   useEffect(() => {
     getOwners(PARK_ID).then(setOwners)
@@ -44,7 +62,67 @@ export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen
   const opl = kavels.filter(isOpgeleverd).length
   const act = kavels.filter(isActief).length
   const verkocht = kavels.filter(k => k.verkocht).length
-  const fases = [...new Set(kavels.map(k => k.fase))].sort()
+  const fases = [...new Set(kavels.map(k => k.fase))].sort()  // all fases from all kavels
+
+  const activeFilterCount = filters.fases.length + filters.status.length + filters.verkoop.length +
+    filters.voortgang.length + filters.opties.length + filters.termijn.length + (filters.search ? 1 : 0)
+
+  const clearFilters = () => setFilters({ search:'', fases:[], status:[], verkoop:[], voortgang:[], opties:[], termijn:[] })
+
+  function toggleFilter(key: keyof typeof filters, val: unknown) {
+    setFilters(prev => {
+      const arr = prev[key] as unknown[]
+      return { ...prev, [key]: arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val] }
+    })
+  }
+
+
+
+
+
+  const TERMIJN_VOLGORDE_KEYS = ['eerste_termijn','doorgang_fase','bouw_gestart','transport','geplaatst','gereed_oplevering','opgeleverd']
+
+  
+  
+  
+  const filteredKavels = kavels.filter(k => {
+    if (filters.search) {
+      const q = filters.search.toLowerCase()
+      const ownerMatch = k.owner?.name?.toLowerCase().includes(q)
+      const numMatch = String(k.number).includes(q)
+      if (!ownerMatch && !numMatch) return false
+    }
+    if (filters.fases.length && !filters.fases.includes(k.fase)) return false
+    if (filters.status.length) {
+      const done = isOpgeleverd(k), active = isActief(k)
+      const s = done ? 'opgeleverd' : active ? 'actief' : 'gepland'
+      if (!filters.status.includes(s)) return false
+    }
+    if (filters.verkoop.length) {
+      const v = k.verkocht ? 'verkocht' : 'beschikbaar'
+      if (!filters.verkoop.includes(v)) return false
+    }
+    if (filters.voortgang.length) {
+      const pct = getKavelPct(k.status)
+      const bucket = pct < 25 ? '0-25' : pct < 50 ? '25-50' : pct < 75 ? '50-75' : '75-100'
+      if (!filters.voortgang.includes(bucket)) return false
+    }
+    if (filters.opties.length) {
+      const hasAll = filters.opties.every(optKey => {
+        const entry = k.opties ? (k.opties as unknown as Record<string,unknown>)[optKey + '_besteld'] || (k.opties as unknown as Record<string,unknown>)[optKey + '_gereed'] : false
+        return !!entry
+      })
+      if (!hasAll) return false
+    }
+    if (filters.termijn.length) {
+      const kBet = betalingen.filter(b => b.kavel_id === k.id)
+      const maxIdx = Math.max(-1, ...kBet.map(b => TERMIJN_VOLGORDE_KEYS.indexOf(b.termijn_key)))
+      const currentKey = maxIdx >= 0 ? TERMIJN_VOLGORDE_KEYS[maxIdx] : 'geen'
+      if (!filters.termijn.includes(currentKey)) return false
+    }
+    return true
+  const filteredCount = filteredKavels.length
+  })
 
   const selectKavel = useCallback((id: string) => {
     setSelectedId(id); setPanelOpen(true)
@@ -115,7 +193,7 @@ export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-[26px] font-bold tracking-[-0.5px]">{park?.name ?? 'Park'}</h1>
-          <p className="text-[14px] text-[#6e6e73] mt-0.5">Bouwplanning & kavelstatus</p>
+          <p className="text-[14px] text-[#6e6e73] mt-0.5">{activeFilterCount > 0 ? `Bouwplanning & kavelstatus · ${filteredKavels.length} van ${total} kavels` : 'Bouwplanning & kavelstatus'}</p>
         </div>
         <div className="flex gap-2 pt-0.5">
           <button className="px-4 py-1.5 rounded-full text-[13px] font-medium bg-black/[0.06] text-[#3a3a3c] hover:bg-black/10 transition-all">
@@ -151,7 +229,7 @@ export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen
             const faseStatus = faseStatussen.find(f => f.fase === fase)
             return (
               <PhaseBlock key={fase} fase={fase}
-                kavels={kavels.filter(k => k.fase === fase)}
+                kavels={filteredKavels.filter(k => k.fase === fase)}
                 selectedId={selectedId}
                 onSelect={selectKavel}
                 mapUrl={parkMaps.find(m => m.fase === fase)?.map_url ?? null}
@@ -164,10 +242,88 @@ export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen
             )
           })}
         </div>
-        <div className="sticky top-7">
+        <div className="sticky top-7 flex flex-col gap-3">
           <MapWidget park={park} kavels={kavels} highlightId={selectedId}
             mapId={parkMaps.find(m => m.fase === null)?.id ?? null}
             onKavelClick={(id) => { setSelectedId(id); setPanelOpen(true) }} />
+
+          {/* Filter blok */}
+          <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-black/[0.02] transition-all"
+              onClick={() => setFilterOpen(o => !o)}>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-[#aeaeb2] transition-transform" style={{display:'inline-block', transform: filterOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}}>▼</span>
+                <span className="text-[13px] font-semibold">Filters</span>
+                {activeFilterCount > 0 && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">{activeFilterCount} actief</span>
+                )}
+              </div>
+              {activeFilterCount > 0 && (
+                <button onClick={e => { e.stopPropagation(); clearFilters() }}
+                  className="text-[11px] font-medium text-[#0071e3] px-2.5 py-1 rounded-full bg-[rgba(0,113,227,0.08)] hover:bg-[rgba(0,113,227,0.14)] transition-all">
+                  × Alles wissen
+                </button>
+              )}
+            </div>
+
+            {filterOpen && (
+              <div className="px-4 pb-4 border-t border-black/[0.05]">
+                {/* Zoeken */}
+                <div className="mt-3 mb-3">
+                  <input value={filters.search} onChange={e => setFilters(p => ({...p, search: e.target.value}))}
+                    placeholder="Zoek op kavel of eigenaar…"
+                    className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-full px-3.5 py-2 text-[12px] outline-none focus:border-[#0071e3] transition-all" />
+                </div>
+
+                <FilterSection title="Fase">
+                  {fases.map(f => (
+                    <Chip key={f} label={`Fase ${f}`} active={filters.fases.includes(f)}
+                      onClick={() => toggleFilter('fases', f)} />
+                  ))}
+                </FilterSection>
+
+                <FilterSection title="Bouwstatus">
+                  {[['gepland','Gepland'],['actief','In uitvoering'],['opgeleverd','Opgeleverd']].map(([v,l]) => (
+                    <Chip key={v} label={l} active={filters.status.includes(v)}
+                      onClick={() => toggleFilter('status', v)} />
+                  ))}
+                </FilterSection>
+
+                <FilterSection title="Verkoop">
+                  {[['verkocht','Verkocht'],['beschikbaar','Beschikbaar']].map(([v,l]) => (
+                    <Chip key={v} label={l} active={filters.verkoop.includes(v)}
+                      onClick={() => toggleFilter('verkoop', v)} />
+                  ))}
+                </FilterSection>
+
+                <FilterSection title="Voortgang">
+                  {[['0-25','0–25%'],['25-50','25–50%'],['50-75','50–75%'],['75-100','75–100%']].map(([v,l]) => (
+                    <Chip key={v} label={l} active={filters.voortgang.includes(v)}
+                      onClick={() => toggleFilter('voortgang', v)} />
+                  ))}
+                </FilterSection>
+
+                <FilterSection title="Opties">
+                  {[['airco','Airco'],['hottub','Hottub'],['zonnepanelen','Zonnepanelen'],['tuinaanleg','Tuinaanleg'],
+                    ['pergola','Pergola'],['berging','Berging'],['meubels','Meubels'],['loungeset','Loungeset'],
+                    ['horren','Horren'],['zitkuil','Zitkuil']].map(([v,l]) => (
+                    <Chip key={v} label={l} active={filters.opties.includes(v)}
+                      onClick={() => toggleFilter('opties', v)} />
+                  ))}
+                </FilterSection>
+
+                <FilterSection title="Betalingstermijn" last>
+                  {[['geen','Geen termijn'],['eerste_termijn','Eerste termijn'],['doorgang_fase','Doorgang fase'],
+                    ['bouw_gestart','Bouw gestart'],['transport','Transport'],['geplaatst','Geplaatst'],
+                    ['gereed_oplevering','Gereed oplevering'],['opgeleverd','Opgeleverd']].map(([v,l]) => (
+                    <Chip key={v} label={l} active={filters.termijn.includes(v)}
+                      onClick={() => toggleFilter('termijn', v)} />
+                  ))}
+                </FilterSection>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -268,5 +424,27 @@ export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen
         </>
       )}
     </div>
+  )
+}
+
+function FilterSection({ title, children, last = false }: { title: string; children: React.ReactNode; last?: boolean }) {
+  return (
+    <div className={`py-2.5 ${!last ? 'border-b border-black/[0.05]' : ''}`}>
+      <div className="text-[10px] font-semibold text-[#aeaeb2] uppercase tracking-[0.07em] mb-2">{title}</div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
+  )
+}
+
+function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick}
+      className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all
+        ${active
+          ? 'bg-[rgba(0,113,227,0.10)] border-[rgba(0,113,227,0.3)] text-[#004f9e]'
+          : 'bg-[#f5f5f7] border-black/[0.06] text-[#6e6e73] hover:bg-[#e8e8ed] hover:text-[#3a3a3c]'
+        }`}>
+      {label}
+    </button>
   )
 }

@@ -336,6 +336,9 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                     {currentPts.length > 0 && (
                       <>
                         <button onClick={() => setCurrentPts(p => p.slice(0,-1))} className="px-2.5 py-1 rounded-lg text-[12px] bg-black/[0.06] hover:bg-black/10">↩ Undo</button>
+                        {currentPts.length >= 3 && (
+                          <button onClick={closePoly} className="px-2.5 py-1 rounded-lg text-[12px] bg-[#0071e3] text-white hover:bg-[#0077ed] font-medium">✓ Sluiten</button>
+                        )}
                         <button onClick={() => { setCurrentPts([]); setEditingId(null) }} className="px-2.5 py-1 rounded-lg text-[12px] bg-black/[0.06] hover:bg-black/10">Annuleren</button>
                       </>
                     )}

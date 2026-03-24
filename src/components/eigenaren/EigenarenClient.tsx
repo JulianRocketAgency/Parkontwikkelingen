@@ -29,8 +29,14 @@ export function EigenarenClient({ owners, kavels }: Props) {
   const [toast, setToast] = useState('')
   const router = useRouter()
 
+  const refreshBetalingen = () => getBetalingen('11111111-0000-0000-0000-000000000001').then(setBetalingen)
+
   useEffect(() => {
-    getBetalingen('11111111-0000-0000-0000-000000000001').then(setBetalingen)
+    refreshBetalingen()
+    // Refresh when tab gets focus (user switched from dashboard)
+    const onFocus = () => refreshBetalingen()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [])
 
   useEffect(() => {
@@ -125,9 +131,15 @@ export function EigenarenClient({ owners, kavels }: Props) {
           <h1 className="text-[26px] font-bold tracking-[-0.5px]">Eigenaren</h1>
           <p className="text-[14px] text-[#6e6e73] mt-0.5">Kopersoverzicht, kavels & betalingstermijnen</p>
         </div>
-        <button className="px-4 py-1.5 rounded-full text-[13px] font-medium bg-[#0071e3] text-white hover:bg-[#0077ed] transition-all">
-          + Eigenaar
-        </button>
+        <div className="flex gap-2">
+          <button onClick={refreshBetalingen}
+            className="px-4 py-1.5 rounded-full text-[13px] font-medium bg-black/[0.06] text-[#3a3a3c] hover:bg-black/10 transition-all">
+            ↻ Verversen
+          </button>
+          <button className="px-4 py-1.5 rounded-full text-[13px] font-medium bg-[#0071e3] text-white hover:bg-[#0077ed] transition-all">
+            + Eigenaar
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-[1fr_380px] gap-4 items-start">

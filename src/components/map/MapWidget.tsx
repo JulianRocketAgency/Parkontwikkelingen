@@ -11,34 +11,34 @@ interface Props {
   onKavelClick: (id: string) => void
 }
 
-interface CanvasDims { w: number; h: number; ox: number; oy: number }
-
 export function MapWidget({ park, kavels, highlightId, onKavelClick }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
-  const [dims, setDims] = useState<CanvasDims | null>(null)
+  const [imgEl, setImgEl] = useState<HTMLImageElement | null>(null)
+  const [dims, setDims] = useState<{ cw: number; ch: number } | null>(null)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, y: 0 })
   const panStart = useRef({ x: 0, y: 0 })
 
+  // Load image when URL available
   useEffect(() => {
-    if (!park?.map_image || !canvasRef.current || !boxRef.current) return
+    if (!park?.map_image) return
     const img = new Image()
+    img.crossOrigin = 'anonymous'
     img.onload = () => {
-      const box = boxRef.current!
-      const W = box.clientWidth, H = box.clientHeight
+      setImgEl(img)
+      const box = boxRef.current
+      if (!box) return
+      const W = box.clientWidth || 290
+      const H = box.clientHeight || 240
       const scale = Math.min(W / img.width, H / img.height)
-      const cw = Math.round(img.width * scale)
-      const ch = Math.round(img.height * scale)
-      const ox = Math.round((W - cw) / 2)
-      const oy = Math.round((H - ch) / 2)
-      const canvas = canvasRef.current!
-      canvas.width = cw; canvas.height = ch
-      canvas.getContext('2d')!.drawImage(img, 0, 0, cw, ch)
-      setDims({ w: cw, h: ch, ox, oy })
+      setDims({
+        cw: Math.round(img.width * scale),
+        ch: Math.round(img.height * scale),
+      })
     }
+    img.onerror = (e) => console.error('Map image failed to load:', e)
     img.src = park.map_image
   }, [park?.map_image])
 
@@ -51,7 +51,7 @@ export function MapWidget({ park, kavels, highlightId, onKavelClick }: Props) {
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     isDragging.current = true
     dragStart.current = { x: e.clientX, y: e.clientY }
-    panStart.current = { ...pan }
+    panStart.current = pan
   }, [pan])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
@@ -65,8 +65,6 @@ export function MapWidget({ park, kavels, highlightId, onKavelClick }: Props) {
   const handleMouseUp = useCallback(() => { isDragging.current = false }, [])
 
   const withPolygon = kavels.filter(k => k.polygon && k.polygon.length >= 3)
-
-  const transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
 
   return (
     <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] overflow-hidden">
@@ -92,7 +90,7 @@ export function MapWidget({ park, kavels, highlightId, onKavelClick }: Props) {
         <div
           ref={boxRef}
           className="w-full h-[260px] bg-[#f5f5f7] rounded-2xl relative overflow-hidden flex items-center justify-center"
-          style={{ cursor: isDragging.current ? 'grabbing' : dims ? 'grab' : 'default' }}
+          style={{ cursor: dims ? (isDragging.current ? 'grabbing' : 'grab') : 'default' }}
           onWheel={handleWheel}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -108,31 +106,41 @@ export function MapWidget({ park, kavels, highlightId, onKavelClick }: Props) {
               </Link>
             </div>
           )}
-          {park?.map_image && dims && (
+
+          {park?.map_image && !imgEl && (
+            <div className="text-[12px] text-[#aeaeb2]">Laden…</div>
+          )}
+
+          {imgEl && dims && (
             <div
               style={{
                 position: 'absolute',
-                left: dims.ox, top: dims.oy,
-                width: dims.w, height: dims.h,
-                transform,
+                left: '50%',
+                top: '50%',
+                width: dims.cw,
+                height: dims.ch,
+                transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`,
                 transformOrigin: 'center center',
-                transition: isDragging.current ? 'none' : 'transform 0.1s',
               }}
             >
-              <canvas ref={canvasRef} style={{ position: 'absolute', left: 0, top: 0 }} />
+              {/* Draw image on canvas */}
+              <ImageCanvas img={imgEl} cw={dims.cw} ch={dims.ch} />
+
+              {/* SVG polygon overlay */}
               <svg
                 style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'all' }}
-                width={dims.w} height={dims.h}
-                viewBox={`0 0 ${dims.w} ${dims.h}`}
+                width={dims.cw}
+                height={dims.ch}
+                viewBox={`0 0 ${dims.cw} ${dims.ch}`}
               >
                 {withPolygon.map(k => {
                   const hl = highlightId === k.id
                   const done = isOpgeleverd(k), active = isActief(k)
                   const fill = hl ? 'rgba(0,113,227,0.28)' : done ? 'rgba(48,209,88,0.20)' : active ? 'rgba(255,159,10,0.20)' : 'rgba(174,174,178,0.16)'
                   const stroke = hl ? '#0071e3' : done ? '#30d158' : active ? '#ff9f0a' : '#aeaeb2'
-                  const pts = k.polygon!.map(p => `${(p.x/100*dims.w).toFixed(1)},${(p.y/100*dims.h).toFixed(1)}`).join(' ')
-                  const cx = (k.polygon!.reduce((s,p) => s+p.x,0)/k.polygon!.length/100*dims.w).toFixed(1)
-                  const cy = (k.polygon!.reduce((s,p) => s+p.y,0)/k.polygon!.length/100*dims.h).toFixed(1)
+                  const pts = k.polygon!.map(p => `${(p.x/100*dims.cw).toFixed(1)},${(p.y/100*dims.ch).toFixed(1)}`).join(' ')
+                  const cx = (k.polygon!.reduce((s,p) => s+p.x,0)/k.polygon!.length/100*dims.cw).toFixed(1)
+                  const cy = (k.polygon!.reduce((s,p) => s+p.y,0)/k.polygon!.length/100*dims.ch).toFixed(1)
                   const textFill = hl ? '#0071e3' : done ? '#1a7a32' : active ? '#a05a00' : '#6e6e73'
                   return (
                     <g key={k.id} style={{ cursor: 'pointer' }} onClick={() => onKavelClick(k.id)}>
@@ -151,4 +159,16 @@ export function MapWidget({ park, kavels, highlightId, onKavelClick }: Props) {
       </div>
     </div>
   )
+}
+
+// Separate component so canvas draws when mounted
+function ImageCanvas({ img, cw, ch }: { img: HTMLImageElement; cw: number; ch: number }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    if (!ref.current) return
+    ref.current.width = cw
+    ref.current.height = ch
+    ref.current.getContext('2d')!.drawImage(img, 0, 0, cw, ch)
+  }, [img, cw, ch])
+  return <canvas ref={ref} style={{ position: 'absolute', left: 0, top: 0 }} />
 }

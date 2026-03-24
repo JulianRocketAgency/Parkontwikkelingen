@@ -195,12 +195,30 @@ export async function upsertParkMap(parkId: string, fase: number | null, file: F
   const supabase = createClient()
   const faseStr = fase === null ? 'overall' : `fase-${fase}`
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png'
-  const path = `${parkId}/${faseStr}.${ext}`
+  // Unique filename to bust CDN cache
+  const timestamp = Date.now()
+  const path = `${parkId}/${faseStr}-${timestamp}.${ext}`
+
+  // Delete old file(s) for this fase
+  const { data: existing } = await supabase.storage
+    .from('park-maps')
+    .list(parkId)
+  if (existing) {
+    const oldFiles = existing
+      .filter(f => f.name.startsWith(faseStr + '-') || f.name.startsWith(faseStr + '.'))
+      .map(f => `${parkId}/${f.name}`)
+    if (oldFiles.length > 0) {
+      await supabase.storage.from('park-maps').remove(oldFiles)
+    }
+  }
+
   const { error: uploadError } = await supabase.storage
     .from('park-maps')
-    .upload(path, file, { upsert: true })
+    .upload(path, file, { upsert: false })
   if (uploadError) throw uploadError
+
   const { data: { publicUrl } } = supabase.storage.from('park-maps').getPublicUrl(path)
+
   await supabase.from('park_maps').upsert(
     { park_id: parkId, fase, map_url: publicUrl },
     { onConflict: 'park_id,fase' }

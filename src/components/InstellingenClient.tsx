@@ -335,14 +335,14 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                       </>
                     )}
                   </div>
-                  <div className="grid grid-cols-[1fr_160px] gap-3">
-                    <div ref={wrapRef} className={`relative bg-[#e8e8ed] rounded-2xl overflow-hidden w-full ${editingId ? 'cursor-crosshair' : 'cursor-default'}`} style={{minHeight: 300}}>
-                      <canvas ref={canvasRef} onClick={onCanvasClick}
-                        onMouseMove={e => { if (editingId && currentPts.length > 0) { const r = e.currentTarget.getBoundingClientRect(); const scaleX = editorW/r.width; const scaleY = editorH/r.height; setHoverPx({x:(e.clientX-r.left)*scaleX,y:(e.clientY-r.top)*scaleY}) }}} />
-                    </div>
-                    {/* Kavel list for this fase */}
-                    <div className="flex flex-col gap-1 max-h-[440px] overflow-y-auto">
-                      <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-1">Kavels</div>
+                  <div ref={wrapRef} className={`relative bg-[#e8e8ed] rounded-2xl overflow-hidden w-full ${editingId ? 'cursor-crosshair' : 'cursor-default'}`}>
+                    <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'auto'}} onClick={onCanvasClick}
+                      onMouseMove={e => { if (editingId && currentPts.length > 0) { const r = e.currentTarget.getBoundingClientRect(); const scaleX = editorW/r.width; const scaleY = editorH/r.height; setHoverPx({x:(e.clientX-r.left)*scaleX,y:(e.clientY-r.top)*scaleY}) }}} />
+                  </div>
+                  {/* Kavel list below canvas */}
+                  <div className="mt-3">
+                    <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-2">Kavels — klik om gebied te tekenen</div>
+                    <div className="flex flex-wrap gap-1.5">
                       {faseKavelsForEditor.map(k => {
                         const hasPoly = k.polygon && k.polygon.length >= 3
                         const isEd = editingId === k.id
@@ -352,9 +352,9 @@ export function InstellingenClient({ park, kavels: initial }: Props) {
                               ${isEd ? 'bg-[rgba(0,113,227,0.10)] border-[rgba(0,113,227,0.35)] text-[#004f9e]'
                               : hasPoly ? 'bg-[rgba(48,209,88,0.10)] border-[rgba(48,209,88,0.3)]'
                               : 'bg-[#f5f5f7] border-black/[0.05] hover:bg-[#e8e8ed]'}`}>
-                            <span className="font-semibold text-[#aeaeb2] min-w-[26px]">#{k.number}</span>
-                            <span className="flex-1 truncate">{k.type}</span>
-                            <span>{isEd ? '●' : hasPoly ? '✓' : ''}</span>
+                            <span className="font-semibold text-[#aeaeb2]">#{k.number}</span>
+                            <span>{k.type}</span>
+                            <span className="text-[10px]">{isEd ? '●' : hasPoly ? '✓' : ''}</span>
                           </div>
                         )
                       })}

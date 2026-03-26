@@ -210,3 +210,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply: 'Er is een fout opgetreden.' }, { status: 500 })
   }
 }
+// DEBUG - remove later
+export async function GET() {
+  const context = await getParkContext()
+  const hottubLines = context.split('\n').filter(l => l.toLowerCase().includes('hottub'))
+  return Response.json({ hottubLines, contextLength: context.length })
+}

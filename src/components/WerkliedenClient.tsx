@@ -93,7 +93,7 @@ export function WerkliedenClient({ profiles: initial }: Props) {
         </div>
         <button onClick={() => setShowModal(true)}
           className="px-4 py-1.5 rounded-full text-[13px] font-medium bg-[#0071e3] text-white hover:bg-[#0077ed] transition-all">
-          + Uitnodigen
+          + Toevoegen
         </button>
       </div>
 
@@ -120,11 +120,9 @@ export function WerkliedenClient({ profiles: initial }: Props) {
                           <div className="text-[13px] font-medium text-[#1d1d1f]">{name}</div>
                           <div className="text-[11px] text-[#6e6e73]">{p.email ?? ''}</div>
                         </div>
-                        <select value={p.role ?? 'vakman'}
-                          onChange={e => handleRoleChange(p.id, e.target.value)}
-                          className="bg-[#f5f5f7] border border-black/[0.05] rounded-[8px] px-2.5 py-1.5 text-[12px] outline-none focus:border-[#0071e3] transition-all">
-                          {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                        </select>
+                        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${ROLE_COLORS[p.role ?? 'vakman']}`}>
+                          {ROLE_LABELS[p.role ?? 'vakman']}
+                        </span>
                       </div>
                     )
                   })}
@@ -140,7 +138,7 @@ export function WerkliedenClient({ profiles: initial }: Props) {
         <>
           <div className="fixed inset-0 bg-black/[0.22] backdrop-blur-[4px] z-[200]" onClick={() => setShowModal(false)} />
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] bg-white rounded-[20px] shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-black/[0.05] w-[420px] p-6">
-            <div className="text-[16px] font-bold mb-1">Gebruiker aanmaken</div>
+            <div className="text-[16px] font-bold mb-1">Gebruiker toevoegen</div>
             <div className="text-[13px] text-[#6e6e73] mb-5">Maak een nieuw account aan en wijs een rol toe.</div>
             <div className="flex flex-col gap-3">
               <div>

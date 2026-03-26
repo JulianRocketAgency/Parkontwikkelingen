@@ -1,5 +1,6 @@
 'use client'
 import { useRef, useState, useEffect } from 'react'
+import { CategorieenClient } from '@/components/CategorieenClient'
 import type { Park, Kavel } from '@/types'
 import { isOpgeleverd, isActief, OPTIES, STATUS_LABELS } from '@/types'
 import {
@@ -9,7 +10,14 @@ import {
   type Dependency, type ParkMap, type KavelPolygon
 } from '@/lib/queries'
 
-interface Props { park: Park | null; kavels: Kavel[]; parkMaps?: unknown[]; allParks?: { id: string; name: string }[] }
+interface Props {
+  park: Park | null
+  kavels: Kavel[]
+  parkMaps?: unknown[]
+  allParks?: { id: string; name: string }[]
+  optieCategorieen?: import('@/lib/queries').OptieCategorie[]
+  vakmanCategorieen?: import('@/lib/queries').VakmanCategorie[]
+}
 type Pt = { x: number; y: number }
 const PARK_ID = '11111111-0000-0000-0000-000000000001'
 
@@ -34,7 +42,7 @@ async function pdfToImageUrl(file: File): Promise<string> {
   return url
 }
 
-export function InstellingenClient({ park, kavels: initial, allParks = [] }: Props) {
+export function InstellingenClient({ park, kavels: initial, allParks = [], optieCategorieen = [], vakmanCategorieen = [] }: Props) {
   const [kavels, setKavels] = useState(initial)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingFase, setEditingFase] = useState<number | null>(null)
@@ -57,6 +65,7 @@ export function InstellingenClient({ park, kavels: initial, allParks = [] }: Pro
     start_date: park?.start_date ?? '',
     end_date: park?.end_date ?? '',
   })
+  const [optieKoppelingen, setOptieKoppelingen] = useState<Record<string, string>>({})
   const wrapRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
@@ -552,6 +561,14 @@ export function InstellingenClient({ park, kavels: initial, allParks = [] }: Pro
             </div>
           </div>
         </div>
+
+        {/* Categorieën */}
+        <CategorieenClient
+          optieCategorieen={optieCategorieen}
+          vakmanCategorieen={vakmanCategorieen}
+          optieKoppelingen={optieKoppelingen}
+          onOptieKoppelingChange={(key, catId) => setOptieKoppelingen(prev => ({...prev, [key]: catId}))}
+        />
 
         {/* Bottom grid */}
         <div className="grid grid-cols-2 gap-4">

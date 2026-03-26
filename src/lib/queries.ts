@@ -433,3 +433,53 @@ export async function verkoopKavel(
     await triggerBetalingstermijn(kavelId, ownerId, 'eerste_termijn', config.naam)
   }
 }
+
+// ── Optie categorieën ─────────────────────────────────────────
+export interface OptieCategorie {
+  id: string
+  park_id: string
+  naam: string
+  volgorde: number
+}
+
+export async function getOptieCategorieen(parkId: string): Promise<OptieCategorie[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('optie_categorieen').select('*').eq('park_id', parkId).order('volgorde')
+  return data ?? []
+}
+
+export async function createOptieCategorie(parkId: string, naam: string): Promise<OptieCategorie | null> {
+  const supabase = createClient()
+  const { data } = await supabase.from('optie_categorieen').insert({ park_id: parkId, naam }).select().single()
+  return data
+}
+
+export async function deleteOptieCategorie(id: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('optie_categorieen').delete().eq('id', id)
+}
+
+// ── Vakman categorieën ────────────────────────────────────────
+export interface VakmanCategorie {
+  id: string
+  park_id: string
+  naam: string
+  volgorde: number
+}
+
+export async function getVakmanCategorieen(parkId: string): Promise<VakmanCategorie[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('vakman_categorieen').select('*').eq('park_id', parkId).order('volgorde')
+  return data ?? []
+}
+
+export async function createVakmanCategorie(parkId: string, naam: string): Promise<VakmanCategorie | null> {
+  const supabase = createClient()
+  const { data } = await supabase.from('vakman_categorieen').insert({ park_id: parkId, naam }).select().single()
+  return data
+}
+
+export async function deleteVakmanCategorie(id: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('vakman_categorieen').delete().eq('id', id)
+}

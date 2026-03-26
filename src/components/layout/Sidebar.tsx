@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import { User } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { LayoutGrid, Users, Settings, MessageCircle, HardHat } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -55,17 +56,22 @@ export function Sidebar({ userName = 'Gebruiker', userRole = 'gebruiker' }: Prop
           </Link>
         )
       })}
-      <div className="mt-auto pt-3 border-t border-black/[0.05]">
-        <button onClick={handleLogout}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[10px] hover:bg-black/[0.05] transition-all text-left">
+      <div className="mt-auto pt-3 border-t border-black/[0.05] flex flex-col gap-0.5">
+        <Link href="/account"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] hover:bg-black/[0.05] transition-all">
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#0071e3] to-[#30d158]
             flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0">
             {initials || 'JD'}
           </div>
-          <div>
-            <div className="text-[13px] font-medium text-[#3a3a3c]">{userName}</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-medium text-[#3a3a3c] truncate">{userName}</div>
             <div className="text-[11px] text-[#aeaeb2]">{ROLE_LABELS[userRole] ?? userRole}</div>
           </div>
+        </Link>
+        <button onClick={handleLogout}
+          className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] hover:bg-black/[0.05] transition-all text-left text-[13px] text-[#6e6e73]">
+          <User size={14} className="flex-shrink-0 ml-0.5" />
+          Uitloggen
         </button>
       </div>
     </nav>

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getPark, getKavels } from '@/lib/queries'
+import { getPark, getKavels, getParkMaps } from '@/lib/queries'
 import { InstellingenClient } from '@/components/InstellingenClient'
 import { redirect } from 'next/navigation'
 
@@ -10,10 +10,12 @@ export default async function InstellingenPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [park, kavels] = await Promise.all([
+  const [park, kavels, parkMaps, allParks] = await Promise.all([
     getPark(PARK_ID),
     getKavels(PARK_ID),
+    getParkMaps(PARK_ID),
+    supabase.from('parks').select('id, name').then(r => r.data ?? []),
   ])
 
-  return <InstellingenClient park={park} kavels={kavels} />
+  return <InstellingenClient park={park} kavels={kavels} parkMaps={parkMaps} allParks={allParks} />
 }

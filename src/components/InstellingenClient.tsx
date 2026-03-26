@@ -1,6 +1,5 @@
 'use client'
 import { useRef, useState, useEffect } from 'react'
-import { CategorieenClient } from '@/components/CategorieenClient'
 import type { Park, Kavel } from '@/types'
 import { isOpgeleverd, isActief, OPTIES, STATUS_LABELS } from '@/types'
 import {
@@ -9,14 +8,15 @@ import {
   updatePark, getPolygonsForMap, upsertKavelPolygonForMap,
   type Dependency, type ParkMap, type KavelPolygon
 } from '@/lib/queries'
+import { FileJson } from 'lucide-react'
 
 interface Props {
   park: Park | null
   kavels: Kavel[]
-  parkMaps?: unknown[]
+  parkMaps?: ParkMap[]
   allParks?: { id: string; name: string }[]
-  optieCategorieen?: import('@/lib/queries').OptieCategorie[]
   vakmanCategorieen?: import('@/lib/queries').VakmanCategorie[]
+  optieCategorieen?: import('@/lib/queries').OptieCategorie[]
 }
 type Pt = { x: number; y: number }
 const PARK_ID = '11111111-0000-0000-0000-000000000001'
@@ -42,7 +42,7 @@ async function pdfToImageUrl(file: File): Promise<string> {
   return url
 }
 
-export function InstellingenClient({ park, kavels: initial, allParks = [], optieCategorieen = [], vakmanCategorieen = [] }: Props) {
+export function InstellingenClient({ park, kavels: initial, allParks = [], vakmanCategorieen = [], optieCategorieen = [] }: Props) {
   const [kavels, setKavels] = useState(initial)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingFase, setEditingFase] = useState<number | null>(null)
@@ -65,7 +65,6 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], optie
     start_date: park?.start_date ?? '',
     end_date: park?.end_date ?? '',
   })
-  const [optieKoppelingen, setOptieKoppelingen] = useState<Record<string, string>>({})
   const wrapRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
@@ -77,49 +76,6 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], optie
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(''), 2500); return () => clearTimeout(t) }
   }, [toast])
-
-  async function downloadTemplate() {
-    const xlsx = await import('xlsx')
-    const wb = xlsx.utils.book_new()
-
-    // Kavels sheet
-    const kavelData = [
-      ['nummer', 'fase', 'type', 'uitvoering', 'chassis', 'eigenaar_naam', 'eigenaar_email', 'eigenaar_telefoon'],
-      [100, 1, 'Tiny 2p', 'Rechts', '13158', 'Jan de Vries', 'jan@example.nl', '06-12345678'],
-      [102, 1, 'Tiny 4p', 'Links', '13141', '', '', ''],
-    ]
-    const ws1 = xlsx.utils.aoa_to_sheet(kavelData)
-    ws1['!cols'] = kavelData[0].map(() => ({ wch: 20 }))
-    xlsx.utils.book_append_sheet(wb, ws1, 'Kavels')
-
-    // Eigenaren sheet
-    const eigenaarData = [
-      ['naam', 'contact', 'email', 'telefoon', 'adres'],
-      ['Jan de Vries', 'Jan', 'jan@example.nl', '06-12345678', 'Straat 1, Stad'],
-    ]
-    const ws2 = xlsx.utils.aoa_to_sheet(eigenaarData)
-    ws2['!cols'] = eigenaarData[0].map(() => ({ wch: 25 }))
-    xlsx.utils.book_append_sheet(wb, ws2, 'Eigenaren')
-
-    xlsx.writeFile(wb, 'parkbouw-template.xlsx')
-    setToast('Template gedownload ✓')
-  }
-
-  async function handleExcelUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setToast('Bestand verwerken...')
-    try {
-      const xlsx = await import('xlsx')
-      const buffer = await file.arrayBuffer()
-      const wb = xlsx.read(buffer)
-      const sheet = wb.Sheets[wb.SheetNames[0]]
-      const rows = xlsx.utils.sheet_to_json(sheet) as Record<string, unknown>[]
-      setToast(`${rows.length} rijen geladen — import functie binnenkort beschikbaar`)
-    } catch {
-      setToast('Bestand kon niet worden gelezen')
-    }
-  }
 
   async function savePark() {
     try { await updatePark(PARK_ID, parkForm); setToast('Parkgegevens opgeslagen ✓') }
@@ -271,54 +227,6 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], optie
         <p className="text-[14px] text-[#6e6e73] mt-0.5">Park & platform configuratie</p>
       </div>
       <div className="flex flex-col gap-4">
-
-        {/* Park omschakelen */}
-        <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
-          <div className="text-[15px] font-semibold mb-1">Park</div>
-          <div className="text-[13px] text-[#6e6e73] mb-4">Schakel tussen parken of voeg een nieuw park toe.</div>
-          <div className="flex gap-3 flex-wrap">
-            {allParks.map((p: { id: string; name: string }) => (
-              <div key={p.id}
-                className={`px-4 py-2.5 rounded-[12px] border text-[13px] font-medium cursor-pointer transition-all
-                  ${p.id === park?.id
-                    ? 'bg-[rgba(0,113,227,0.10)] border-[rgba(0,113,227,0.3)] text-[#004f9e]'
-                    : 'bg-[#f5f5f7] border-black/[0.05] text-[#3a3a3c] hover:bg-[#e8e8ed]'
-                  }`}>
-                {p.name}
-                {p.id === park?.id && <span className="ml-2 text-[10px]">✓ Actief</span>}
-              </div>
-            ))}
-            <button className="px-4 py-2.5 rounded-[12px] border border-dashed border-[#d1d1d6] text-[13px] text-[#aeaeb2] hover:border-[#0071e3] hover:text-[#0071e3] transition-all">
-              + Park toevoegen
-            </button>
-          </div>
-        </div>
-
-        {/* Excel import/export */}
-        <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
-          <div className="text-[15px] font-semibold mb-1">Data import & export</div>
-          <div className="text-[13px] text-[#6e6e73] mb-5">Download een template en vul de kavels en eigenaren in. Upload daarna het ingevulde bestand om alles in één keer te importeren.</div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="border border-dashed border-[#d1d1d6] rounded-[14px] p-5 text-center hover:border-[#0071e3] hover:bg-[rgba(0,113,227,0.02)] transition-all">
-              <div className="text-[24px] mb-2">⬇</div>
-              <div className="text-[13px] font-medium text-[#1d1d1f] mb-1">Download template</div>
-              <div className="text-[12px] text-[#6e6e73] mb-4">Excel bestand met alle kolommen voorbereid</div>
-              <button onClick={() => downloadTemplate()}
-                className="px-5 py-2 rounded-full bg-[#0071e3] text-white text-[12px] font-medium hover:bg-[#0077ed] transition-all">
-                Download .xlsx
-              </button>
-            </div>
-            <div className="border border-dashed border-[#d1d1d6] rounded-[14px] p-5 text-center hover:border-[#0071e3] hover:bg-[rgba(0,113,227,0.02)] transition-all">
-              <div className="text-[24px] mb-2">⬆</div>
-              <div className="text-[13px] font-medium text-[#1d1d1f] mb-1">Data uploaden</div>
-              <div className="text-[12px] text-[#6e6e73] mb-4">Upload het ingevulde Excel bestand</div>
-              <label className="px-5 py-2 rounded-full bg-[#f5f5f7] border border-black/[0.08] text-[#3a3a3c] text-[12px] font-medium hover:bg-[#e8e8ed] transition-all cursor-pointer">
-                Kies bestand
-                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => handleExcelUpload(e)} />
-              </label>
-            </div>
-          </div>
-        </div>
 
         {/* Plattegronden */}
         <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
@@ -561,14 +469,6 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], optie
             </div>
           </div>
         </div>
-
-        {/* Categorieën */}
-        <CategorieenClient
-          optieCategorieen={optieCategorieen}
-          vakmanCategorieen={vakmanCategorieen}
-          optieKoppelingen={optieKoppelingen}
-          onOptieKoppelingChange={(key, catId) => setOptieKoppelingen(prev => ({...prev, [key]: catId}))}
-        />
 
         {/* Bottom grid */}
         <div className="grid grid-cols-2 gap-4">

@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import type { VakmanCategorie } from '@/lib/queries'
 
 interface Profile {
   id: string
@@ -9,9 +10,13 @@ interface Profile {
   email: string | null
   role: string | null
   avatar_color: string | null
+  vakman_categorie_id: string | null
 }
 
-interface Props { profiles: Profile[] }
+interface Props {
+  profiles: Profile[]
+  vakmanCategorieen: VakmanCategorie[]
+}
 
 const ROLES = ['developer', 'projectleider', 'planner', 'vakman', 'koper']
 const ROLE_LABELS: Record<string, string> = {
@@ -30,11 +35,11 @@ function initials(name: string) {
   return name.split(/[\s\-]+/).filter(Boolean).slice(0,2).map(x => x[0].toUpperCase()).join('')
 }
 
-export function WerkliedenClient({ profiles: initial }: Props) {
+export function WerkliedenClient({ profiles: initial, vakmanCategorieen }: Props) {
   const [profiles, setProfiles] = useState(initial)
   const [toast, setToast] = useState('')
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState({ naam: '', email: '', wachtwoord: '', role: 'vakman' })
+  const [form, setForm] = useState({ naam: '', email: '', wachtwoord: '', role: 'vakman', vakman_categorie_id: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const supabase = createClient()
@@ -45,38 +50,30 @@ export function WerkliedenClient({ profiles: initial }: Props) {
   }, {} as Record<string, Profile[]>)
 
   async function handleCreate() {
-    if (!form.naam || !form.email || !form.wachtwoord) {
-      setError('Vul alle velden in')
-      return
-    }
-    setSaving(true)
-    setError('')
+    if (!form.naam || !form.email || !form.wachtwoord) { setError('Vul alle velden in'); return }
+    setSaving(true); setError('')
     try {
-      // Create auth user via admin API — use service role
       const res = await fetch('/api/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ naam: form.naam, email: form.email, wachtwoord: form.wachtwoord, role: form.role }),
+        body: JSON.stringify(form),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Aanmaken mislukt')
-
       setProfiles(prev => [...prev, data.profile])
       setShowModal(false)
-      setForm({ naam: '', email: '', wachtwoord: '', role: 'vakman' })
+      setForm({ naam: '', email: '', wachtwoord: '', role: 'vakman', vakman_categorie_id: '' })
       setToast('Gebruiker aangemaakt ✓')
       setTimeout(() => setToast(''), 2500)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Fout opgetreden')
-    } finally {
-      setSaving(false)
-    }
+    } finally { setSaving(false) }
   }
 
-  async function handleRoleChange(profileId: string, newRole: string) {
-    await supabase.from('profiles').update({ role: newRole }).eq('id', profileId)
-    setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, role: newRole } : p))
-    setToast('Rol bijgewerkt ✓')
+  async function handleUpdate(profileId: string, updates: Partial<Profile>) {
+    await supabase.from('profiles').update(updates).eq('id', profileId)
+    setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, ...updates } : p))
+    setToast('Bijgewerkt ✓')
     setTimeout(() => setToast(''), 2000)
   }
 
@@ -85,11 +82,10 @@ export function WerkliedenClient({ profiles: initial }: Props) {
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[rgba(29,29,31,0.9)] backdrop-blur-xl text-white px-5 py-2.5 rounded-full text-[13px] font-medium z-50">{toast}</div>
       )}
-
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-[26px] font-bold tracking-[-0.5px]">Werklieden</h1>
-          <p className="text-[14px] text-[#6e6e73] mt-0.5">Actieve accounts en roltoewijzing</p>
+          <p className="text-[14px] text-[#6e6e73] mt-0.5">Accounts, rollen en vakman types</p>
         </div>
         <button onClick={() => setShowModal(true)}
           className="px-4 py-1.5 rounded-full text-[13px] font-medium bg-[#0071e3] text-white hover:bg-[#0077ed] transition-all">
@@ -112,17 +108,36 @@ export function WerkliedenClient({ profiles: initial }: Props) {
                 <div className="divide-y divide-black/[0.05]">
                   {members.map(p => {
                     const name = p.naam ?? p.full_name ?? p.email ?? 'Onbekend'
+                    const vakmanCat = vakmanCategorieen.find(c => c.id === p.vakman_categorie_id)
                     return (
                       <div key={p.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-black/[0.02] transition-all">
                         <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold text-white flex-shrink-0"
                           style={{ background: p.avatar_color ?? '#0071e3' }}>{initials(name)}</div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <div className="text-[13px] font-medium text-[#1d1d1f]">{name}</div>
                           <div className="text-[11px] text-[#6e6e73]">{p.email ?? ''}</div>
                         </div>
-                        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${ROLE_COLORS[p.role ?? 'vakman']}`}>
-                          {ROLE_LABELS[p.role ?? 'vakman']}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {/* Rol badge */}
+                          <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${ROLE_COLORS[p.role ?? 'vakman']}`}>
+                            {ROLE_LABELS[p.role ?? 'vakman']}
+                          </span>
+                          {/* Vakman type — alleen tonen/instellen bij vakman rol */}
+                          {p.role === 'vakman' && (
+                            <select
+                              value={p.vakman_categorie_id ?? ''}
+                              onChange={e => handleUpdate(p.id, { vakman_categorie_id: e.target.value || null })}
+                              className="bg-[rgba(255,159,10,0.08)] border border-[rgba(255,159,10,0.2)] rounded-full px-2.5 py-1 text-[11px] font-medium text-[#a05a00] outline-none focus:border-[#ff9f0a] transition-all">
+                              <option value="">Type vakman...</option>
+                              {vakmanCategorieen.map(c => <option key={c.id} value={c.id}>{c.naam}</option>)}
+                            </select>
+                          )}
+                          {vakmanCat && p.role !== 'vakman' && (
+                            <span className="text-[11px] px-2.5 py-1 rounded-full bg-[rgba(255,159,10,0.08)] text-[#a05a00] border border-[rgba(255,159,10,0.2)]">
+                              {vakmanCat.naam}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )
                   })}
@@ -133,7 +148,7 @@ export function WerkliedenClient({ profiles: initial }: Props) {
         })}
       </div>
 
-      {/* Uitnodig modal */}
+      {/* Modal */}
       {showModal && (
         <>
           <div className="fixed inset-0 bg-black/[0.22] backdrop-blur-[4px] z-[200]" onClick={() => setShowModal(false)} />
@@ -161,11 +176,21 @@ export function WerkliedenClient({ profiles: initial }: Props) {
               </div>
               <div>
                 <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Rol</label>
-                <select value={form.role} onChange={e => setForm(p => ({...p, role: e.target.value}))}
+                <select value={form.role} onChange={e => setForm(p => ({...p, role: e.target.value, vakman_categorie_id: ''}))}
                   className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] transition-all">
                   {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                 </select>
               </div>
+              {form.role === 'vakman' && vakmanCategorieen.length > 0 && (
+                <div>
+                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Type vakman</label>
+                  <select value={form.vakman_categorie_id} onChange={e => setForm(p => ({...p, vakman_categorie_id: e.target.value}))}
+                    className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] transition-all">
+                    <option value="">Selecteer type...</option>
+                    {vakmanCategorieen.map(c => <option key={c.id} value={c.id}>{c.naam}</option>)}
+                  </select>
+                </div>
+              )}
               {error && <div className="text-[12px] text-[#ff3b30] bg-[rgba(255,59,48,0.08)] rounded-[8px] px-3 py-2">{error}</div>}
             </div>
             <div className="flex gap-2 mt-5">

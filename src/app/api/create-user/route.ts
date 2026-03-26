@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
   try {
-    const { naam, email, wachtwoord, role } = await req.json()
+    const { naam, email, wachtwoord, role, vakman_categorie_id } = await req.json()
 
     // Use service role to create users
     const supabase = createClient(
@@ -31,6 +31,7 @@ export async function POST(req: Request) {
         email,
         role,
         avatar_color: '#0071e3',
+        vakman_categorie_id: vakman_categorie_id || null,
       })
       .select()
       .single()

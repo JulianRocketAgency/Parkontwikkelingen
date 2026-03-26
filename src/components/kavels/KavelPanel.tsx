@@ -1,6 +1,6 @@
 'use client'
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { X, ChevronDown, Loader2 } from 'lucide-react'
+import { X, ChevronDown, Loader2, ShoppingBag } from 'lucide-react'
 import type { Kavel, Owner } from '@/types'
 import { STATUS_LABELS, OPTIES, getOptie, getKavelPct } from '@/types'
 import {
@@ -33,6 +33,7 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [expandedOptie, setExpandedOptie] = useState<string | null>(null)
+  const [gekochteOptiesOpen, setGekochteOptiesOpen] = useState(true)
   const [deps, setDeps] = useState<Dependency[]>([])
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -55,36 +56,20 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
           transport_date: updated.transport_date,
         })
         onUpdate(updated)
-
-        // Trigger betalingstermijn als een relevant vinkje aangezet wordt
         if (changedStatusKey && updated.owner_id && updated.status) {
           const statusVal = updated.status[changedStatusKey as keyof typeof updated.status]
           if (statusVal === true) {
-            // Map status key to trigger key
-            const triggerMap: Record<string, string> = {
-              bouw_gestart:      'bouw_gestart',
-              geplaatst:         'geplaatst',
-              intern_opgeleverd: 'intern_opgeleverd',
-              opgeleverd:        'opgeleverd',
-            }
-            const triggerKey = triggerMap[changedStatusKey]
+            const triggerKey = TRIGGER_MAP[changedStatusKey]
             if (triggerKey) {
               const config = termijnConfig.find(t => t.trigger === triggerKey && t.actief)
-              if (config) {
-                await triggerBetalingstermijn(updated.id, updated.owner_id, config.termijn_key, config.naam)
-              }
+              if (config) await triggerBetalingstermijn(updated.id, updated.owner_id, config.termijn_key, config.naam)
             }
           }
         }
-
-        // Transport datum trigger
         if (changedStatusKey === 'transport_date' && updated.transport_date && updated.owner_id) {
           const config = termijnConfig.find(t => t.trigger === 'transport_datum' && t.actief)
-          if (config) {
-            await triggerBetalingstermijn(updated.id, updated.owner_id, config.termijn_key, config.naam)
-          }
+          if (config) await triggerBetalingstermijn(updated.id, updated.owner_id, config.termijn_key, config.naam)
         }
-
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
       } catch (e) { console.error(e) }
@@ -100,20 +85,22 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
   function toggleStatus(key: string) {
     if (!k.status) return
     const currentVal = k.status[key as keyof typeof k.status]
-    const updated = {
-      ...k,
-      status: { ...k.status, [key]: !currentVal },
-    }
-    update(updated, key)
+    update({ ...k, status: { ...k.status, [key]: !currentVal } }, key)
   }
 
-  function setOptieField(optKey: string, field: 'besteld' | 'gereed' | 'notitie', value: boolean | string) {
+  function setOptieField(optKey: string, field: 'besteld' | 'gereed' | 'notitie' | 'gekocht', value: boolean | string) {
     const updated = {
       ...k,
       opties: k.opties ? { ...k.opties, [`${optKey}_${field}`]: value } : k.opties,
     }
     update(updated)
   }
+
+  // Opties die gekocht zijn
+  const gekochteOpties = OPTIES.filter(({ key }) => {
+    const opties = k.opties as unknown as Record<string, unknown>
+    return opties?.[key + '_gekocht'] === true
+  })
 
   return (
     <>
@@ -122,7 +109,7 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
         border-l border-black/[0.08] shadow-[0_12px_40px_rgba(0,0,0,0.12)]
         animate-in slide-in-from-right duration-300">
 
-        {/* Head */}
+        {/* Header */}
         <div className="px-6 py-4 border-b border-black/[0.05] flex items-center bg-white/75 backdrop-blur-xl flex-shrink-0 gap-3">
           <div className="flex-1">
             <div className="text-[16px] font-bold tracking-[-0.2px]">Kavel #{k.number}</div>
@@ -130,7 +117,6 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
               {k.type} · Fase {k.fase}{k.owner?.name ? ` · ${k.owner.name}` : ''}
             </div>
           </div>
-          {/* Verkoop badge / knop */}
           {k.verkocht ? (
             <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-[rgba(48,209,88,0.13)] text-[#1a7a32]">Verkocht</span>
           ) : (
@@ -163,8 +149,7 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
               <Field label="Uitvoering">{k.uitvoering ?? '—'}</Field>
               <Field label="Chassisnummer"><span className="font-mono text-[12px]">{k.chassis ?? '—'}</span></Field>
               <EditField label="Gereed bouwer" value={k.gereed_bouwer ?? ''} onChange={v => update({...k, gereed_bouwer: v})} />
-              <EditField label="Transportdatum" value={k.transport_date ?? ''}
-                onChange={v => update({...k, transport_date: v}, 'transport_date')} />
+              <EditField label="Transportdatum" value={k.transport_date ?? ''} onChange={v => update({...k, transport_date: v}, 'transport_date')} />
               <Field label="Huisdieren">
                 <select value={k.huisdieren ? 'Ja' : 'Nee'}
                   onChange={e => update({...k, huisdieren: e.target.value === 'Ja'})}
@@ -201,82 +186,123 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
             </div>
           </Section>
 
-          <Section title="Opties & bestellingen">
-            <div className="flex flex-col gap-1.5">
-              {OPTIES.map(({ key, label }) => {
-                const entry = getOptie(k.opties, key)
-                const isOpen = expandedOptie === key
-                const hasActivity = entry.besteld || entry.gereed || entry.notitie
-                const vereist = deps.filter(d => d.type === 'optie_optie' && d.trigger_key === key)
-                const vereistDoor = deps.filter(d => d.type === 'optie_optie' && d.requires_key === key)
-                const geblokkeerd = deps.filter(d => d.type === 'status_optie' && d.requires_key === key)
-                  .filter(d => k.status && !k.status[d.trigger_key as keyof typeof k.status])
-
-                return (
-                  <div key={key}
-                    className={`rounded-[12px] border transition-all overflow-hidden
-                      ${hasActivity ? 'border-[rgba(0,113,227,0.2)] bg-[rgba(0,113,227,0.04)]' : 'border-black/[0.06] bg-[#f5f5f7]'}`}>
-                    <div className="flex items-center gap-3 px-3 py-2.5">
-                      <button onClick={() => setOptieField(key, 'besteld', !entry.besteld)}
-                        className="flex items-center gap-1.5 flex-shrink-0">
-                        <Checkbox checked={entry.besteld} color="blue" size="sm" />
-                        <span className="text-[10px] font-medium text-[#6e6e73]">Besteld</span>
-                      </button>
-                      <button onClick={() => setOptieField(key, 'gereed', !entry.gereed)}
-                        className="flex items-center gap-1.5 flex-shrink-0">
-                        <Checkbox checked={entry.gereed} color="green" size="sm" />
-                        <span className="text-[10px] font-medium text-[#6e6e73]">Gereed</span>
-                      </button>
-                      <span className={`text-[13px] font-medium flex-1 ${hasActivity ? 'text-[#1d1d1f]' : 'text-[#3a3a3c]'}`}>{label}</span>
-                      {(() => {
-                        const catId = optieKoppelingen[key]
-                        const cat = catId ? vakmanCategorieen.find(c => c.id === catId) : null
-                        return cat ? <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.10)] text-[#a05a00] whitespace-nowrap">{cat.naam}</span> : null
-                      })()}
-                      {entry.gereed && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.15)] text-[#1a7a32]">Gereed</span>}
-                      {entry.besteld && !entry.gereed && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.12)] text-[#004f9e]">Besteld</span>}
-                      <button onClick={() => setExpandedOptie(isOpen ? null : key)}
-                        className="p-1 rounded-lg hover:bg-black/[0.06] transition-all flex-shrink-0">
-                        <ChevronDown size={13} className={`text-[#aeaeb2] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                      </button>
+          {/* Gekochte opties — inklapbaar */}
+          <div className="mb-6">
+            <button onClick={() => setGekochteOptiesOpen(o => !o)}
+              className="w-full flex items-center gap-2 text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.07em] mb-2.5 pb-1.5 border-b border-black/[0.05] hover:text-[#6e6e73] transition-all">
+              <ShoppingBag size={11} />
+              <span className="flex-1 text-left">Gekochte opties</span>
+              <span className="normal-case text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-black/[0.06]">
+                {gekochteOpties.length}/{OPTIES.length}
+              </span>
+              <ChevronDown size={11} className={`transition-transform ${gekochteOptiesOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {gekochteOptiesOpen && (
+              <div className="grid grid-cols-2 gap-1">
+                {OPTIES.map(({ key, label }) => {
+                  const opties = k.opties as unknown as Record<string, unknown>
+                  const isGekocht = opties?.[key + '_gekocht'] === true
+                  return (
+                    <div key={key} onClick={() => setOptieField(key, 'gekocht', !isGekocht)}
+                      className={`flex items-center gap-2 px-2.5 py-2 rounded-[10px] cursor-pointer border transition-all
+                        ${isGekocht
+                          ? 'bg-[rgba(48,209,88,0.08)] border-[rgba(48,209,88,0.25)] text-[#1a7a32]'
+                          : 'bg-[#f5f5f7] border-black/[0.05] text-[#6e6e73] hover:bg-[#e8e8ed]'
+                        }`}>
+                      <Checkbox checked={isGekocht} color="green" size="sm" />
+                      <span className="text-[12px] font-medium">{label}</span>
                     </div>
-                    {/* Dependency indicators */}
-                    {(geblokkeerd.length > 0 || vereist.length > 0 || vereistDoor.length > 0) && (
-                      <div className="px-3 pb-2 flex flex-wrap gap-1.5">
-                        {geblokkeerd.map(d => (
-                          <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,59,48,0.10)] text-[#8b1a1a]">
-                            ⊘ Wacht op: {STATUS_LABELS[d.trigger_key] ?? d.trigger_key}
-                          </span>
-                        ))}
-                        {vereist.map(d => (
-                          <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.12)] text-[#a05a00]">
-                            → Vereist: {OPTIES.find(o=>o.key===d.requires_key)?.label ?? d.requires_key}
-                          </span>
-                        ))}
-                        {vereistDoor.map(d => (
-                          <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">
-                            ← Vereist door: {OPTIES.find(o=>o.key===d.trigger_key)?.label ?? d.trigger_key}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {isOpen && (
-                      <div className="px-3 pb-3 border-t border-black/[0.05]">
-                        <textarea value={entry.notitie}
-                          onChange={e => setOptieField(key, 'notitie', e.target.value)}
-                          placeholder="Opmerking bij deze optie…" rows={2}
-                          className="w-full mt-2 bg-white border border-black/[0.05] rounded-[8px] px-3 py-2 text-[12px] resize-none outline-none focus:border-[#0071e3] transition-all placeholder:text-[#aeaeb2]" />
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Bestellingen — alleen gekochte opties */}
+          <div className="mb-6">
+            <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.07em] mb-2.5 pb-1.5 border-b border-black/[0.05]">
+              Bestellingen
             </div>
-          </Section>
+            {gekochteOpties.length === 0 ? (
+              <div className="text-[13px] text-[#aeaeb2] py-3 text-center bg-[#f5f5f7] rounded-[10px]">
+                Geen opties gekocht — vink ze aan bij Gekochte opties
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {gekochteOpties.map(({ key, label }) => {
+                  const entry = getOptie(k.opties, key)
+                  const isOpen = expandedOptie === key
+                  const hasActivity = entry.besteld || entry.gereed || entry.notitie
+                  const vereist = deps.filter(d => d.type === 'optie_optie' && d.trigger_key === key)
+                  const vereistDoor = deps.filter(d => d.type === 'optie_optie' && d.requires_key === key)
+                  const geblokkeerd = deps.filter(d => d.type === 'status_optie' && d.requires_key === key)
+                    .filter(d => k.status && !k.status[d.trigger_key as keyof typeof k.status])
+                  const catId = optieKoppelingen[key]
+                  const cat = catId ? vakmanCategorieen.find(c => c.id === catId) : null
+
+                  return (
+                    <div key={key}
+                      className={`rounded-[12px] border transition-all overflow-hidden
+                        ${hasActivity ? 'border-[rgba(0,113,227,0.2)] bg-[rgba(0,113,227,0.04)]' : 'border-black/[0.06] bg-[#f5f5f7]'}`}>
+                      <div className="flex items-center gap-3 px-3 py-2.5">
+                        <button onClick={() => setOptieField(key, 'besteld', !entry.besteld)}
+                          className="flex items-center gap-1.5 flex-shrink-0">
+                          <Checkbox checked={entry.besteld} color="blue" size="sm" />
+                          <span className="text-[10px] font-medium text-[#6e6e73]">Besteld</span>
+                        </button>
+                        <button onClick={() => setOptieField(key, 'gereed', !entry.gereed)}
+                          className="flex items-center gap-1.5 flex-shrink-0">
+                          <Checkbox checked={entry.gereed} color="green" size="sm" />
+                          <span className="text-[10px] font-medium text-[#6e6e73]">Gereed</span>
+                        </button>
+                        <span className={`text-[13px] font-medium flex-1 ${hasActivity ? 'text-[#1d1d1f]' : 'text-[#3a3a3c]'}`}>{label}</span>
+                        {cat && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.10)] text-[#a05a00] whitespace-nowrap">{cat.naam}</span>
+                        )}
+                        {entry.gereed && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.15)] text-[#1a7a32]">Gereed</span>}
+                        {entry.besteld && !entry.gereed && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.12)] text-[#004f9e]">Besteld</span>}
+                        <button onClick={() => setExpandedOptie(isOpen ? null : key)}
+                          className="p-1 rounded-lg hover:bg-black/[0.06] transition-all flex-shrink-0">
+                          <ChevronDown size={13} className={`text-[#aeaeb2] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                      </div>
+                      {(geblokkeerd.length > 0 || vereist.length > 0 || vereistDoor.length > 0) && (
+                        <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+                          {geblokkeerd.map(d => (
+                            <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,59,48,0.10)] text-[#8b1a1a]">
+                              Wacht op: {STATUS_LABELS[d.trigger_key] ?? d.trigger_key}
+                            </span>
+                          ))}
+                          {vereist.map(d => (
+                            <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.12)] text-[#a05a00]">
+                              Vereist: {OPTIES.find(o=>o.key===d.requires_key)?.label ?? d.requires_key}
+                            </span>
+                          ))}
+                          {vereistDoor.map(d => (
+                            <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">
+                              Vereist door: {OPTIES.find(o=>o.key===d.trigger_key)?.label ?? d.trigger_key}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {isOpen && (
+                        <div className="px-3 pb-3 border-t border-black/[0.05]">
+                          <textarea value={entry.notitie}
+                            onChange={e => setOptieField(key, 'notitie', e.target.value)}
+                            placeholder="Opmerking bij deze optie..." rows={2}
+                            className="w-full mt-2 bg-white border border-black/[0.05] rounded-[8px] px-3 py-2 text-[12px] resize-none outline-none focus:border-[#0071e3] transition-all placeholder:text-[#aeaeb2]" />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
 
           <Section title="Bijzonderheden">
             <textarea value={k.notitie ?? ''} onChange={e => update({...k, notitie: e.target.value})}
-              placeholder="Notities, bijzonderheden…"
+              placeholder="Notities, bijzonderheden..."
               className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] resize-y min-h-[70px] outline-none focus:border-[#0071e3] focus:bg-white transition-all placeholder:text-[#aeaeb2]" />
           </Section>
         </div>
@@ -327,7 +353,7 @@ function Checkbox({ checked, color, size = 'md' }: { checked: boolean; color: 'b
     : 'border-[#aeaeb2]'
   return (
     <div className={`${sz} border-[1.5px] flex items-center justify-center transition-all flex-shrink-0 ${bg}`}>
-      {checked && <span className="text-white font-bold" style={{ fontSize: size === 'sm' ? 8 : 10 }}>✓</span>}
+      {checked && <span className="text-white font-bold" style={{ fontSize: size === 'sm' ? 8 : 10 }}>v</span>}
     </div>
   )
 }

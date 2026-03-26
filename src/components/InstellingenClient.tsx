@@ -6,17 +6,18 @@ import {
   getParkMaps, upsertParkMap, deleteParkMap,
   getDependencies, createDependency, deleteDependency,
   updatePark, getPolygonsForMap, upsertKavelPolygonForMap,
-  type Dependency, type ParkMap, type KavelPolygon
+  type Dependency, type ParkMap, type KavelPolygon,
+  type VakmanCategorie, type OptieCategorie,
 } from '@/lib/queries'
-import { FileJson } from 'lucide-react'
+import { CategorieenClient } from '@/components/CategorieenClient'
 
 interface Props {
   park: Park | null
   kavels: Kavel[]
   parkMaps?: ParkMap[]
   allParks?: { id: string; name: string }[]
-  vakmanCategorieen?: import('@/lib/queries').VakmanCategorie[]
-  optieCategorieen?: import('@/lib/queries').OptieCategorie[]
+  vakmanCategorieen?: VakmanCategorie[]
+  optieCategorieen?: OptieCategorie[]
 }
 type Pt = { x: number; y: number }
 const PARK_ID = '11111111-0000-0000-0000-000000000001'
@@ -65,6 +66,7 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
     start_date: park?.start_date ?? '',
     end_date: park?.end_date ?? '',
   })
+  const [optieKoppelingen, setOptieKoppelingen] = useState<Record<string, string>>({})
   const wrapRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
@@ -80,6 +82,43 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
   async function savePark() {
     try { await updatePark(PARK_ID, parkForm); setToast('Parkgegevens opgeslagen ✓') }
     catch { setToast('Opslaan mislukt') }
+  }
+
+  async function downloadTemplate() {
+    const xlsx = await import('xlsx')
+    const wb = xlsx.utils.book_new()
+    const kavelData = [
+      ['nummer', 'fase', 'type', 'uitvoering', 'chassis', 'eigenaar_naam', 'eigenaar_email', 'eigenaar_telefoon'],
+      [100, 1, 'Tiny 2p', 'Rechts', '13158', 'Jan de Vries', 'jan@example.nl', '06-12345678'],
+    ]
+    const ws1 = xlsx.utils.aoa_to_sheet(kavelData)
+    ws1['!cols'] = kavelData[0].map(() => ({ wch: 20 }))
+    xlsx.utils.book_append_sheet(wb, ws1, 'Kavels')
+    const eigenaarData = [
+      ['naam', 'contact', 'email', 'telefoon', 'adres'],
+      ['Jan de Vries', 'Jan', 'jan@example.nl', '06-12345678', 'Straat 1, Stad'],
+    ]
+    const ws2 = xlsx.utils.aoa_to_sheet(eigenaarData)
+    ws2['!cols'] = eigenaarData[0].map(() => ({ wch: 25 }))
+    xlsx.utils.book_append_sheet(wb, ws2, 'Eigenaren')
+    xlsx.writeFile(wb, 'parkbouw-template.xlsx')
+    setToast('Template gedownload ✓')
+  }
+
+  async function handleExcelUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setToast('Bestand verwerken...')
+    try {
+      const xlsx = await import('xlsx')
+      const buffer = await file.arrayBuffer()
+      const wb = xlsx.read(buffer)
+      const sheet = wb.Sheets[wb.SheetNames[0]]
+      const rows = xlsx.utils.sheet_to_json(sheet) as Record<string, unknown>[]
+      setToast(`${rows.length} rijen geladen — import binnenkort beschikbaar`)
+    } catch {
+      setToast('Bestand kon niet worden gelezen')
+    }
   }
 
   function loadMapIntoEditor(url: string, fase: number | null, mapId?: string) {
@@ -118,10 +157,7 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
       const fp = currentPts[0]
       const pxPerUnit = r.width / editorW
       const threshold = 30 / pxPerUnit
-      if (Math.hypot(px - fp.x/100*editorW, py - fp.y/100*editorH) < threshold) {
-        closePoly()
-        return
-      }
+      if (Math.hypot(px - fp.x/100*editorW, py - fp.y/100*editorH) < threshold) { closePoly(); return }
     }
     setCurrentPts(prev => [...prev, { x: px/editorW*100, y: py/editorH*100 }])
   }
@@ -156,7 +192,7 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
     try {
       let uploadFile = file
       if (file.type === 'application/pdf') {
-        setToast('PDF verwerken…')
+        setToast('PDF verwerken...')
         const dataUrl = await pdfToImageUrl(file)
         const res = await fetch(dataUrl)
         const blob = await res.blob()
@@ -167,7 +203,7 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
       setParkMaps(freshMaps)
       const uploaded = freshMaps.find(m => m.fase === fase)
       if (uploaded) loadMapIntoEditor(uploaded.map_url + '?t=' + Date.now(), fase, uploaded.id)
-      setToast('Plattegrond geüpload ✓')
+      setToast('Plattegrond geupload ✓')
     } catch (err) {
       console.error(err)
       setToast('Upload mislukt')
@@ -228,12 +264,59 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
       </div>
       <div className="flex flex-col gap-4">
 
+        {/* Park omschakelen */}
+        <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
+          <div className="text-[15px] font-semibold mb-1">Park</div>
+          <div className="text-[13px] text-[#6e6e73] mb-4">Schakel tussen parken of voeg een nieuw park toe.</div>
+          <div className="flex gap-3 flex-wrap">
+            {allParks.map((p: { id: string; name: string }) => (
+              <div key={p.id}
+                className={`px-4 py-2.5 rounded-[12px] border text-[13px] font-medium cursor-pointer transition-all
+                  ${p.id === park?.id
+                    ? 'bg-[rgba(0,113,227,0.10)] border-[rgba(0,113,227,0.3)] text-[#004f9e]'
+                    : 'bg-[#f5f5f7] border-black/[0.05] text-[#3a3a3c] hover:bg-[#e8e8ed]'
+                  }`}>
+                {p.name}
+                {p.id === park?.id && <span className="ml-2 text-[10px]">✓ Actief</span>}
+              </div>
+            ))}
+            <button className="px-4 py-2.5 rounded-[12px] border border-dashed border-[#d1d1d6] text-[13px] text-[#aeaeb2] hover:border-[#0071e3] hover:text-[#0071e3] transition-all">
+              + Park toevoegen
+            </button>
+          </div>
+        </div>
+
+        {/* Excel import/export */}
+        <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
+          <div className="text-[15px] font-semibold mb-1">Data import & export</div>
+          <div className="text-[13px] text-[#6e6e73] mb-5">Download een template, vul de kavels en eigenaren in en upload het terug.</div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="border border-dashed border-[#d1d1d6] rounded-[14px] p-5 text-center hover:border-[#0071e3] hover:bg-[rgba(0,113,227,0.02)] transition-all">
+              <div className="text-[24px] mb-2">⬇</div>
+              <div className="text-[13px] font-medium text-[#1d1d1f] mb-1">Download template</div>
+              <div className="text-[12px] text-[#6e6e73] mb-4">Excel bestand met alle kolommen voorbereid</div>
+              <button onClick={() => downloadTemplate()}
+                className="px-5 py-2 rounded-full bg-[#0071e3] text-white text-[12px] font-medium hover:bg-[#0077ed] transition-all">
+                Download .xlsx
+              </button>
+            </div>
+            <div className="border border-dashed border-[#d1d1d6] rounded-[14px] p-5 text-center hover:border-[#0071e3] hover:bg-[rgba(0,113,227,0.02)] transition-all">
+              <div className="text-[24px] mb-2">⬆</div>
+              <div className="text-[13px] font-medium text-[#1d1d1f] mb-1">Data uploaden</div>
+              <div className="text-[12px] text-[#6e6e73] mb-4">Upload het ingevulde Excel bestand</div>
+              <label className="px-5 py-2 rounded-full bg-[#f5f5f7] border border-black/[0.08] text-[#3a3a3c] text-[12px] font-medium hover:bg-[#e8e8ed] transition-all cursor-pointer">
+                Kies bestand
+                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => handleExcelUpload(e)} />
+              </label>
+            </div>
+          </div>
+        </div>
+
         {/* Plattegronden */}
         <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
           <div className="text-[15px] font-semibold mb-1">Plattegronden & kavelindeling</div>
           <div className="text-[13px] text-[#6e6e73] mb-5">Upload een plattegrond per fase en het totaaloverzicht. Ondersteunt PNG, JPG en PDF.</div>
           <div className="grid grid-cols-[200px_1fr] gap-6">
-            {/* Left: map selector */}
             <div>
               <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-2">Plattegronden</div>
               <div className="flex flex-col gap-1.5">
@@ -256,12 +339,12 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
                             </button>
                             <button onClick={() => handleDeleteMap(fase)}
                               className="px-2 py-1 rounded-lg bg-white border border-black/[0.08] text-[11px] text-[#ff3b30] hover:bg-[#fbeaea] transition-all">
-                              ×
+                              x
                             </button>
                           </>
                         ) : (
                           <label className="flex-1 py-1 rounded-lg bg-[#0071e3] text-white text-[11px] text-center cursor-pointer hover:bg-[#0077ed] transition-all">
-                            {isUploading ? 'Uploaden…' : '+ Upload'}
+                            {isUploading ? 'Uploaden...' : '+ Upload'}
                             <input type="file" accept="image/*,.pdf" className="hidden" onChange={e => handleMapUpload(fase, e)} disabled={!!uploading} />
                           </label>
                         )}
@@ -271,17 +354,14 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
                 })}
               </div>
             </div>
-
-            {/* Right: editor */}
             <div>
               {!imgRef.current ? (
                 <div className="flex flex-col items-center justify-center h-full min-h-[300px] border-2 border-dashed border-[#d1d1d6] rounded-2xl text-[#aeaeb2] text-[13px]">
-                  <div className="text-[28px] opacity-30 mb-2">⊡</div>
+                  <div className="text-[28px] opacity-30 mb-2">&#9633;</div>
                   Selecteer een plattegrond links om te bewerken
                 </div>
               ) : (
                 <div>
-                  {/* Toolbar */}
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className="text-[12px] text-[#6e6e73] flex-1">
                       {editingId
@@ -290,22 +370,19 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
                     </span>
                     {currentPts.length > 0 && (
                       <>
-                        <button onClick={() => setCurrentPts(p => p.slice(0,-1))} className="px-2.5 py-1 rounded-lg text-[12px] bg-black/[0.06] hover:bg-black/10">↩ Undo</button>
+                        <button onClick={() => setCurrentPts(p => p.slice(0,-1))} className="px-2.5 py-1 rounded-lg text-[12px] bg-black/[0.06] hover:bg-black/10">Undo</button>
                         {currentPts.length >= 3 && (
-                          <button onClick={closePoly} className="px-2.5 py-1 rounded-lg text-[12px] bg-[#0071e3] text-white hover:bg-[#0077ed] font-medium">✓ Sluiten</button>
+                          <button onClick={closePoly} className="px-2.5 py-1 rounded-lg text-[12px] bg-[#0071e3] text-white hover:bg-[#0077ed] font-medium">Sluiten</button>
                         )}
                         <button onClick={() => { setCurrentPts([]); setEditingId(null) }} className="px-2.5 py-1 rounded-lg text-[12px] bg-black/[0.06] hover:bg-black/10">Annuleren</button>
                       </>
                     )}
-                    {/* Zoom controls */}
                     <div className="flex items-center gap-1 ml-auto">
                       <button onClick={() => setEditorZoom(z => Math.min(+(z+0.25).toFixed(2), 4))} className="w-7 h-7 rounded-lg bg-[#f5f5f7] text-[14px] font-medium hover:bg-[#e8e8ed] flex items-center justify-center">+</button>
-                      <button onClick={() => setEditorZoom(z => { const fit = Math.min(900/editorW, 520/editorH, 1); return Math.round(fit*100)/100 })} className="px-2 h-7 rounded-lg bg-[#f5f5f7] text-[#6e6e73] text-[10px] hover:bg-[#e8e8ed] min-w-[44px] text-center">{Math.round(editorZoom*100)}%</button>
-                      <button onClick={() => setEditorZoom(z => Math.max(+(z-0.25).toFixed(2), 0.1))} className="w-7 h-7 rounded-lg bg-[#f5f5f7] text-[14px] font-medium hover:bg-[#e8e8ed] flex items-center justify-center">−</button>
+                      <button onClick={() => setEditorZoom(() => { const fit = Math.min(900/editorW, 520/editorH, 1); return Math.round(fit*100)/100 })} className="px-2 h-7 rounded-lg bg-[#f5f5f7] text-[#6e6e73] text-[10px] hover:bg-[#e8e8ed] min-w-[44px] text-center">{Math.round(editorZoom*100)}%</button>
+                      <button onClick={() => setEditorZoom(z => Math.max(+(z-0.25).toFixed(2), 0.1))} className="w-7 h-7 rounded-lg bg-[#f5f5f7] text-[14px] font-medium hover:bg-[#e8e8ed] flex items-center justify-center">-</button>
                     </div>
                   </div>
-
-                  {/* Editor canvas */}
                   <div ref={wrapRef} className="relative bg-[#e8e8ed] rounded-2xl overflow-auto" style={{maxHeight: '560px'}}>
                     <div style={{ position: 'relative', width: Math.round(editorW * editorZoom), height: Math.round(editorH * editorZoom) }}>
                       <img src={imgRef.current.src} alt="plattegrond"
@@ -321,7 +398,6 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
                           setHoverPx({ x: (e.clientX - r.left) / r.width * editorW, y: (e.clientY - r.top) / r.height * editorH })
                         }}
                       >
-                        {/* Saved polygons */}
                         {mapPolygons.map(mp => {
                           const k = kavels.find(k => k.id === mp.kavel_id)
                           if (!k || mp.polygon.length < 3) return null
@@ -341,7 +417,6 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
                             </g>
                           )
                         })}
-                        {/* In-progress polygon */}
                         {currentPts.length > 0 && (
                           <g>
                             <polyline
@@ -368,8 +443,6 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
                       </svg>
                     </div>
                   </div>
-
-                  {/* Kavel list */}
                   <div className="mt-3">
                     <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-2">Kavels — klik om gebied te tekenen</div>
                     <div className="flex flex-wrap gap-1.5">
@@ -384,7 +457,7 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
                               : 'bg-[#f5f5f7] border-black/[0.05] hover:bg-[#e8e8ed]'}`}>
                             <span className="font-semibold text-[#aeaeb2]">#{k.number}</span>
                             <span>{k.type}</span>
-                            <span className="text-[10px]">{isEd ? '●' : hasPoly ? '✓' : ''}</span>
+                            <span className="text-[10px]">{isEd ? 'o' : hasPoly ? 'v' : ''}</span>
                           </div>
                         )
                       })}
@@ -395,6 +468,13 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
             </div>
           </div>
         </div>
+
+        {/* Opties & vakmannen */}
+        <CategorieenClient
+          vakmanCategorieen={vakmanCategorieen}
+          optieKoppelingen={optieKoppelingen}
+          onOptieKoppelingChange={(key, catId) => setOptieKoppelingen(prev => ({...prev, [key]: catId}))}
+        />
 
         {/* Afhankelijkheden */}
         <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
@@ -409,9 +489,9 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
                 {ooDeps.map(d => (
                   <div key={d.id} className="flex items-center gap-2 px-3 py-2.5 bg-[#f5f5f7] rounded-[10px] border border-black/[0.05]">
                     <Chip label={optieOptions.find(o=>o.key===d.trigger_key)?.label ?? d.trigger_key} color="blue" />
-                    <span className="text-[11px] text-[#aeaeb2]">→ vereist</span>
+                    <span className="text-[11px] text-[#aeaeb2]">vereist</span>
                     <Chip label={optieOptions.find(o=>o.key===d.requires_key)?.label ?? d.requires_key} color="amber" />
-                    <button onClick={() => removeDep(d.id)} className="ml-auto text-[#aeaeb2] hover:text-[#ff3b30] text-[16px] leading-none">×</button>
+                    <button onClick={() => removeDep(d.id)} className="ml-auto text-[#aeaeb2] hover:text-[#ff3b30] text-[16px] leading-none">x</button>
                   </div>
                 ))}
               </div>
@@ -421,7 +501,7 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
                   <option value="">Als... (optie)</option>
                   {optieOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
                 </select>
-                <span className="text-[11px] text-[#aeaeb2]">→</span>
+                <span className="text-[11px] text-[#aeaeb2]">{"→"}</span>
                 <select value={newOO.requires} onChange={e => setNewOO(p=>({...p,requires:e.target.value}))}
                   className="flex-1 bg-[#f5f5f7] border border-black/[0.05] rounded-[8px] px-2.5 py-2 text-[12px] outline-none focus:border-[#0071e3]">
                   <option value="">Dan... (optie)</option>
@@ -442,9 +522,9 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
                 {soDeps.map(d => (
                   <div key={d.id} className="flex items-center gap-2 px-3 py-2.5 bg-[#f5f5f7] rounded-[10px] border border-black/[0.05]">
                     <Chip label={statusOptions.find(o=>o.key===d.trigger_key)?.label ?? d.trigger_key} color="green" />
-                    <span className="text-[11px] text-[#aeaeb2]">→ vrijgeeft</span>
+                    <span className="text-[11px] text-[#aeaeb2]">vrijgeeft</span>
                     <Chip label={optieOptions.find(o=>o.key===d.requires_key)?.label ?? d.requires_key} color="blue" />
-                    <button onClick={() => removeDep(d.id)} className="ml-auto text-[#aeaeb2] hover:text-[#ff3b30] text-[16px] leading-none">×</button>
+                    <button onClick={() => removeDep(d.id)} className="ml-auto text-[#aeaeb2] hover:text-[#ff3b30] text-[16px] leading-none">x</button>
                   </div>
                 ))}
               </div>
@@ -454,7 +534,7 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
                   <option value="">Als... (status)</option>
                   {statusOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
                 </select>
-                <span className="text-[11px] text-[#aeaeb2]">→</span>
+                <span className="text-[11px] text-[#aeaeb2]">{"→"}</span>
                 <select value={newSO.requires} onChange={e => setNewSO(p=>({...p,requires:e.target.value}))}
                   className="flex-1 bg-[#f5f5f7] border border-black/[0.05] rounded-[8px] px-2.5 py-2 text-[12px] outline-none focus:border-[#0071e3]">
                   <option value="">Dan... (optie)</option>
@@ -470,65 +550,23 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
           </div>
         </div>
 
-        {/* Bottom grid */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
-            <div className="text-[15px] font-semibold mb-1">Parkgegevens</div>
-            <div className="text-[13px] text-[#6e6e73] mb-5">Algemene informatie over dit park.</div>
-            <div className="mb-3">
-              <label className="block text-[12px] font-medium text-[#6e6e73] mb-1.5">Parknaam</label>
-              <input value={parkForm.name} onChange={e => setParkForm(p=>({...p,name:e.target.value}))}
-                className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
-            </div>
-            <div className="mb-3">
-              <label className="block text-[12px] font-medium text-[#6e6e73] mb-1.5">Locatie</label>
-              <input value={parkForm.location} onChange={e => setParkForm(p=>({...p,location:e.target.value}))}
-                className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
-            </div>
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div>
-                <label className="block text-[12px] font-medium text-[#6e6e73] mb-1.5">Startdatum</label>
-                <input type="date" value={parkForm.start_date} onChange={e => setParkForm(p=>({...p,start_date:e.target.value}))}
-                  className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] outline-none focus:border-[#0071e3] transition-all" />
-              </div>
-              <div>
-                <label className="block text-[12px] font-medium text-[#6e6e73] mb-1.5">Opleverdatum</label>
-                <input type="date" value={parkForm.end_date} onChange={e => setParkForm(p=>({...p,end_date:e.target.value}))}
-                  className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] outline-none focus:border-[#0071e3] transition-all" />
-              </div>
-            </div>
-            <button onClick={savePark} className="px-5 py-2 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] transition-all">Opslaan</button>
+        {/* Parkgegevens */}
+        <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
+          <div className="text-[15px] font-semibold mb-1">Parkgegevens</div>
+          <div className="text-[13px] text-[#6e6e73] mb-5">Algemene informatie over dit park.</div>
+          <div className="mb-3">
+            <label className="block text-[12px] font-medium text-[#6e6e73] mb-1.5">Parknaam</label>
+            <input value={parkForm.name} onChange={e => setParkForm(p=>({...p,name:e.target.value}))}
+              className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
           </div>
-          <div className="flex flex-col gap-4">
-            <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
-              <div className="text-[15px] font-semibold mb-1">Gebruikers & rollen</div>
-              <div className="text-[13px] text-[#6e6e73] mb-4">Beheer wie toegang heeft.</div>
-              <div className="flex flex-col gap-2 mb-4">
-                {[['JV','Jan de Vries','jan@heideplas.nl','Ontwikkelaar','#0071e3'],['SB','Sara Bakker','sara@bouwbv.nl','Planner','#bf5af2'],['TH','Tom Hendriks','tom@bouwbv.nl','Vakman','#ff9f0a']].map(([av,name,email,role,col]) => (
-                  <div key={name} className="flex items-center gap-2.5 px-3 py-2.5 bg-[#f5f5f7] rounded-[10px] border border-black/[0.05]">
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0" style={{background:col}}>{av}</div>
-                    <div className="flex-1 min-w-0"><div className="text-[13px] font-medium truncate">{name}</div><div className="text-[11px] text-[#6e6e73] truncate">{email}</div></div>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-black/[0.06] text-[#6e6e73] flex-shrink-0">{role}</span>
-                  </div>
-                ))}
-              </div>
-              <button className="px-4 py-1.5 rounded-full text-[13px] font-medium bg-black/[0.06] text-[#3a3a3c] hover:bg-black/10">+ Gebruiker uitnodigen</button>
-            </div>
-            <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
-              <div className="text-[15px] font-semibold mb-1">Notificaties</div>
-              <div className="text-[13px] text-[#6e6e73] mb-4">Stel in wanneer je meldingen ontvangt.</div>
-              {[['Bij statuswijziging kavel',true],['Bij oplevering woning',true],['Nieuwe eigenaar gekoppeld',false],['Weekrapportage',true]].map(([label,on]) => (
-                <div key={String(label)} className="flex items-center justify-between py-2.5 border-b border-black/[0.05] last:border-0">
-                  <span className="text-[13px]">{label as string}</span>
-                  <div onClick={e=>{(e.currentTarget as HTMLElement).classList.toggle('on');setToast('Instelling gewijzigd')}}
-                    className={`w-9 h-5 rounded-full cursor-pointer transition-colors relative flex-shrink-0 ${on?'bg-[#0071e3] on':'bg-[#e8e8ed]'}`}>
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${on?'left-[18px]':'left-0.5'}`}/>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="mb-3">
+            <label className="block text-[12px] font-medium text-[#6e6e73] mb-1.5">Locatie</label>
+            <input value={parkForm.location} onChange={e => setParkForm(p=>({...p,location:e.target.value}))}
+              className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
           </div>
+          <button onClick={savePark} className="px-5 py-2 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] transition-all">Opslaan</button>
         </div>
+
       </div>
     </div>
   )

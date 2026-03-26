@@ -221,8 +221,8 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
-  const { data: opties } = await supabase.from('kavel_opties').select('kavel_id, hottub_gekocht, airco_gekocht, meubels_gekocht').limit(5)
-  const context = await getParkContext()
-  const kavelsLines = context.split('\n').filter(l => l.includes('Kavel #') || l.includes('Opties gekocht'))
-  return Response.json({ opties, kavelsLines, contextLength: context.length })
+  const { data: kavels } = await supabase.from('kavels').select('id, number').eq('park_id', PARK_ID)
+  const { data: opties } = await supabase.from('kavel_opties').select('kavel_id, hottub_gekocht').eq('hottub_gekocht', true)
+  const matched = opties?.map(o => ({ ...o, number: kavels?.find(k => k.id === o.kavel_id)?.number }))
+  return Response.json({ matched })
 }

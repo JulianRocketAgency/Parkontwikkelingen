@@ -228,6 +228,11 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                         <span className="text-[10px] font-medium text-[#6e6e73]">Gereed</span>
                       </button>
                       <span className={`text-[13px] font-medium flex-1 ${hasActivity ? 'text-[#1d1d1f]' : 'text-[#3a3a3c]'}`}>{label}</span>
+                      {(() => {
+                        const catId = optieKoppelingen[key]
+                        const cat = catId ? vakmanCategorieen.find(c => c.id === catId) : null
+                        return cat ? <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.10)] text-[#a05a00] whitespace-nowrap">{cat.naam}</span> : null
+                      })()}
                       {entry.gereed && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.15)] text-[#1a7a32]">Gereed</span>}
                       {entry.besteld && !entry.gereed && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.12)] text-[#004f9e]">Besteld</span>}
                       <button onClick={() => setExpandedOptie(isOpen ? null : key)}

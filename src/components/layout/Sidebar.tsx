@@ -13,7 +13,17 @@ const navItems = [
   { href: '/instellingen', label: 'Instellingen', icon: Settings },
 ]
 
-export function Sidebar() {
+const ROLE_LABELS: Record<string, string> = {
+  developer: 'Ontwikkelaar', projectleider: 'Projectleider',
+  planner: 'Planner', vakman: 'Vakman', koper: 'Koper', gebruiker: 'Gebruiker',
+}
+
+interface Props {
+  userName?: string
+  userRole?: string
+}
+
+export function Sidebar({ userName = 'Gebruiker', userRole = 'gebruiker' }: Props) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -23,17 +33,16 @@ export function Sidebar() {
     router.push('/login')
   }
 
+  const initials = userName.split(/[\s\-]+/).filter(Boolean).slice(0,2).map(x => x[0].toUpperCase()).join('')
+
   return (
     <nav className="w-[220px] flex-shrink-0 flex flex-col gap-0.5 sticky top-0 h-screen overflow-y-auto
       bg-white/75 backdrop-blur-xl border-r border-black/[0.08] px-3 py-5">
-      {/* Logo */}
       <div className="px-3 pb-4 mb-2 border-b border-black/[0.05]">
         <span className="text-[17px] font-bold tracking-tight">
           Park<span className="text-[#0071e3]">Bouw</span>
         </span>
       </div>
-
-      {/* Nav */}
       <p className="px-3 pt-2 pb-1 text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em]">Menu</p>
       {navItems.map(({ href, label, icon: Icon }) => {
         const active = pathname.startsWith(href)
@@ -46,18 +55,16 @@ export function Sidebar() {
           </Link>
         )
       })}
-
-      {/* User */}
       <div className="mt-auto pt-3 border-t border-black/[0.05]">
         <button onClick={handleLogout}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[10px] hover:bg-black/[0.05] transition-all text-left">
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#0071e3] to-[#30d158]
             flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0">
-            JD
+            {initials || 'JD'}
           </div>
           <div>
-            <div className="text-[13px] font-medium text-[#3a3a3c]">Jan de Vries</div>
-            <div className="text-[11px] text-[#aeaeb2]">Uitloggen</div>
+            <div className="text-[13px] font-medium text-[#3a3a3c]">{userName}</div>
+            <div className="text-[11px] text-[#aeaeb2]">{ROLE_LABELS[userRole] ?? userRole}</div>
           </div>
         </button>
       </div>

@@ -169,6 +169,12 @@ export function ChatClient({ berichten: initial, owners, colleagues, currentUser
     )
   }
 
+  const ROLE_LABELS: Record<string, string> = {
+    developer: 'Ontwikkelaar', projectleider: 'Projectleider',
+    planner: 'Planner', vakman: 'Vakman', koper: 'Koper',
+  }
+  const ROLES = ['developer', 'projectleider', 'planner', 'vakman', 'koper']
+
   function Section({ title, open, onToggle, contacts, badge }: {
     title: string; open: boolean; onToggle: () => void; contacts: Contact[]; badge?: number
   }) {
@@ -189,6 +195,28 @@ export function ChatClient({ berichten: initial, owners, colleagues, currentUser
           <div className="px-3 py-2 text-[11px] text-[#aeaeb2]">Geen gesprekken</div>
         )}
       </div>
+    )
+  }
+
+  function ColleaguesByRole() {
+    return (
+      <>
+        {ROLES.map(role => {
+          const roleContacts = colleagueContacts.filter(c => {
+            const col = colleagues.find(x => x.id === c.id)
+            return (col?.role ?? 'vakman') === role
+          }).filter(filterContact)
+          if (roleContacts.length === 0) return null
+          return (
+            <div key={role}>
+              <div className="px-3 py-1.5">
+                <span className="text-[10px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em]">{ROLE_LABELS[role]}</span>
+              </div>
+              {roleContacts.map(c => <ContactRow key={c.id} contact={c} />)}
+            </div>
+          )
+        })}
+      </>
     )
   }
 
@@ -213,13 +241,21 @@ export function ChatClient({ berichten: initial, owners, colleagues, currentUser
           {filterContact(algemeen) && <ContactRow contact={algemeen} />}
           <div className="h-px bg-black/[0.05] mx-3 my-1" />
           {/* Collega's */}
-          <Section
-            title="Collega's"
-            open={colleaguesOpen}
-            onToggle={() => setColleaguesOpen(o => !o)}
-            contacts={colleagueContacts}
-            badge={colleagueContacts.reduce((s, c) => s + unreadCount(c), 0)}
-          />
+          <div>
+            <div onClick={() => setColleaguesOpen(o => !o)}
+              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-black/[0.02] transition-all">
+              <ChevronRight size={12} className={'text-[#aeaeb2] transition-transform ' + (colleaguesOpen ? 'rotate-90' : '')} />
+              <span className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] flex-1">Collega's</span>
+              {colleagueContacts.reduce((s,c) => s + unreadCount(c), 0) > 0 && (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">{colleagueContacts.reduce((s,c) => s + unreadCount(c), 0)}</span>
+              )}
+              <span className="text-[10px] text-[#aeaeb2]">{colleagueContacts.length}</span>
+            </div>
+            {colleaguesOpen && <ColleaguesByRole />}
+            {colleaguesOpen && colleagueContacts.length === 0 && (
+              <div className="px-3 py-2 text-[11px] text-[#aeaeb2]">Geen collega's</div>
+            )}
+          </div>
           <div className="h-px bg-black/[0.05] mx-3 my-1" />
           {/* Eigenaren */}
           <Section

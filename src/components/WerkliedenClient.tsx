@@ -71,11 +71,9 @@ export function WerkliedenClient({ profiles }: Props) {
                           <div className="text-[13px] font-medium text-[#1d1d1f]">{name}</div>
                           <div className="text-[11px] text-[#6e6e73]">{p.email ?? ''}</div>
                         </div>
-                        <select defaultValue={p.role ?? 'vakman'}
-                          onChange={() => setToast('Rol bijgewerkt')}
-                          className="bg-[#f5f5f7] border border-black/[0.05] rounded-[8px] px-2.5 py-1.5 text-[12px] outline-none">
-                          {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                        </select>
+                        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${ROLE_COLORS[p.role ?? 'vakman']}`}>
+                          {ROLE_LABELS[p.role ?? 'vakman']}
+                        </span>
                       </div>
                     )
                   })}

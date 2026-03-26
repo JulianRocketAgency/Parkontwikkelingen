@@ -218,7 +218,7 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                             ? 'bg-[rgba(255,59,48,0.06)] border-[rgba(255,59,48,0.2)] text-[#6e6e73]'
                             : 'bg-[#f5f5f7] border-black/[0.05] text-[#6e6e73] hover:bg-[#e8e8ed]'
                         }`}>
-                      <Checkbox checked={isGekocht || vereistDoorAangevinkt} color="green" size="sm" />
+                      <Checkbox checked={isGekocht} color="green" size="sm" />
                       <span className="text-[12px] font-medium flex-1">{label}</span>
                       {vereistDoorAangevinkt && !isGekocht && (
                         <span className="w-4 h-4 rounded-full bg-[#ff3b30] flex items-center justify-center text-white font-bold flex-shrink-0" style={{fontSize:9}}>!</span>

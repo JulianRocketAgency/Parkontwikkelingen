@@ -6,6 +6,20 @@ import yaml from 'js-yaml'
 
 const PARK_ID = '11111111-0000-0000-0000-000000000001'
 
+const STATUS_LABELS: Record<string, string> = {
+  bouw_gestart: 'Bouw gestart', geplaatst: 'Geplaatst', aansloten: 'Aangesloten',
+  tuin_aangelegd: 'Tuin aangelegd', meubels_geplaatst: 'Meubels geplaatst',
+  opgestart: 'Opgestart', itt_aangesloten: 'ITT aangesloten',
+  intern_opgeleverd: 'Intern opgeleverd', opgeleverd: 'Opgeleverd',
+}
+const OPTIE_LABELS: Record<string, string> = {
+  meubels: 'Meubels', spec_meubels: 'Spec. meubels', tuinaanleg: 'Tuinaanleg',
+  marindex: 'Marindex', madino: 'Madino', airco: 'Airco', pergola: 'Pergola',
+  hottub: 'Hottub', horren: 'Horren', loungeset: 'Loungeset', zitkuil: 'Zitkuil',
+  berging: 'Berging', zonnepanelen: 'Zonnepanelen',
+}
+const TERMIJN_VOLGORDE = ['eerste_termijn','doorgang_fase','bouw_gestart','transport','geplaatst','gereed_oplevering','opgeleverd']
+
 async function getParkContext() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,62 +27,136 @@ async function getParkContext() {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  const [kavelsRes, ownersRes, betalingenRes, profilesRes] = await Promise.all([
+  const [kavelsRes, ownersRes, betalingenRes, profilesRes, faseRes, termijnConfigRes, depsRes, vakmanCatRes, optieKoppelingenRes] = await Promise.all([
     supabase.from('kavels').select('*, kavel_status(*), kavel_opties(*)').eq('park_id', PARK_ID),
     supabase.from('owners').select('*').eq('park_id', PARK_ID),
     supabase.from('betalingstermijnen').select('*'),
-    supabase.from('profiles').select('*'),
+    supabase.from('profiles').select('*').eq('park_id', PARK_ID),
+    supabase.from('fase_status').select('*').eq('park_id', PARK_ID),
+    supabase.from('termijn_config').select('*').eq('park_id', PARK_ID).order('volgorde'),
+    supabase.from('dependencies').select('*').eq('park_id', PARK_ID),
+    supabase.from('vakman_categorieen').select('*').eq('park_id', PARK_ID),
+    supabase.from('optie_vakman_koppelingen').select('*, vakman_categorieen(naam)').eq('park_id', PARK_ID),
   ])
 
   const kavels = kavelsRes.data ?? []
   const owners = ownersRes.data ?? []
   const betalingen = betalingenRes.data ?? []
   const profiles = profilesRes.data ?? []
+  const faseStatussen = faseRes.data ?? []
+  const termijnConfig = termijnConfigRes.data ?? []
+  const deps = depsRes.data ?? []
+  const vakmanCat = vakmanCatRes.data ?? []
+  const optieKoppelingen = optieKoppelingenRes.data ?? []
 
-  const kavelsText = kavels.map(k => {
+  const lines: string[] = []
+
+  lines.push('=== PARKBOUW DATA ===')
+  lines.push('')
+
+  // Statistieken
+  const totaal = kavels.length
+  const verkocht = kavels.filter(k => k.verkocht).length
+  const opgeleverd = kavels.filter(k => k.kavel_status?.[0]?.opgeleverd === true).length
+  lines.push('OVERZICHT:')
+  lines.push('- Totaal kavels: ' + totaal)
+  lines.push('- Verkocht: ' + verkocht + ' (' + Math.round(verkocht/Math.max(totaal,1)*100) + '%)')
+  lines.push('- Beschikbaar: ' + (totaal - verkocht))
+  lines.push('- Opgeleverd: ' + opgeleverd)
+  lines.push('- Openstaande betalingen: ' + betalingen.filter(b => b.status === 'actief').length)
+  lines.push('- Voldane betalingen: ' + betalingen.filter(b => b.status === 'voldaan').length)
+  lines.push('')
+
+  // Fases
+  lines.push('FASES:')
+  const faseNums = [...new Set(kavels.map(k => k.fase))].sort()
+  for (const fase of faseNums) {
+    const fk = kavels.filter(k => k.fase === fase)
+    const gestart = faseStatussen.find(f => f.fase === fase)
+    const vk = fk.filter(k => k.verkocht).length
+    const ok = fk.filter(k => k.kavel_status?.[0]?.opgeleverd === true).length
+    lines.push('Fase ' + fase + ': ' + fk.length + ' kavels, ' + vk + ' verkocht, ' + ok + ' opgeleverd, gestart: ' + (gestart ? new Date(gestart.gestart_at).toLocaleDateString('nl-NL') : 'nee'))
+  }
+  lines.push('')
+
+  // Kavels
+  lines.push('KAVELS:')
+  for (const k of kavels) {
     const owner = owners.find(o => o.id === k.owner_id)
-    const status = k.kavel_status?.[0]
-    const opties = k.kavel_opties?.[0]
-    const bouw = status ? Object.entries(status)
-      .filter(([key, val]) => !['id','kavel_id','updated_at'].includes(key) && val === true)
-      .map(([key]) => key).join(', ') : 'geen'
+    const status = k.kavel_status?.[0] ?? {}
+    const opties = k.kavel_opties?.[0] ?? {}
+    const bouwGereed = Object.keys(STATUS_LABELS).filter(key => status[key] === true).map(key => STATUS_LABELS[key])
+    const optiesBesteld = Object.keys(OPTIE_LABELS).filter(key => opties[key + '_besteld'] === true).map(key => OPTIE_LABELS[key])
+    const optiesGereed = Object.keys(OPTIE_LABELS).filter(key => opties[key + '_gereed'] === true).map(key => OPTIE_LABELS[key])
     const kBet = betalingen.filter(b => b.kavel_id === k.id)
-    return `Kavel #${k.number} (Fase ${k.fase}, ${k.type}, ${k.uitvoering}): verkocht=${k.verkocht}, eigenaar=${owner?.name ?? 'geen'}, bouw_stappen_gereed=[${bouw}], termijnen=${kBet.length}`
-  }).join('\n')
+    const maxTermijn = TERMIJN_VOLGORDE.reduce((best, key) => kBet.find(b => b.termijn_key === key) ? key : best, 'geen')
+    const pct = Math.round(bouwGereed.length / Object.keys(STATUS_LABELS).length * 100)
+    lines.push('Kavel #' + k.number + ' (Fase ' + k.fase + ', ' + k.type + ', ' + k.uitvoering + '):')
+    lines.push('  Verkocht: ' + (k.verkocht ? 'ja' : 'nee') + ', Eigenaar: ' + (owner?.name ?? 'geen'))
+    lines.push('  Bouwvoortgang: ' + pct + '% - Gereed: ' + (bouwGereed.join(', ') || 'geen'))
+    lines.push('  Opties besteld: ' + (optiesBesteld.join(', ') || 'geen'))
+    lines.push('  Opties gereed: ' + (optiesGereed.join(', ') || 'geen'))
+    lines.push('  Betalingstermijn: ' + maxTermijn + ' (' + kBet.length + '/7 termijnen)')
+    if (k.notitie) lines.push('  Notitie: ' + k.notitie)
+    if (k.transport_date) lines.push('  Transportdatum: ' + k.transport_date)
+  }
+  lines.push('')
 
-  const ownersText = owners.map(o => {
+  // Eigenaren
+  lines.push('EIGENAREN:')
+  for (const o of owners) {
     const kv = kavels.filter(k => k.owner_id === o.id)
-    return `${o.name}: kavels=[${kv.map(k=>'#'+k.number).join(', ')}], email=${o.email ?? '-'}`
-  }).join('\n')
+    const oBet = betalingen.filter(b => kv.some(k => k.id === b.kavel_id))
+    lines.push(o.name + ':')
+    lines.push('  Email: ' + (o.email ?? '-') + ', Telefoon: ' + (o.phone ?? '-'))
+    lines.push('  Kavels: ' + (kv.map(k => '#' + k.number).join(', ') || 'geen'))
+    lines.push('  Betalingen: ' + oBet.filter(b => b.status === 'voldaan').length + '/' + oBet.length + ' voldaan')
+  }
+  lines.push('')
 
-  const profilesText = profiles.map(p =>
-    `${p.naam ?? p.full_name ?? p.email}: rol=${p.role ?? '-'}`
-  ).join('\n')
+  // Team
+  lines.push('TEAM:')
+  for (const p of profiles) {
+    lines.push((p.naam ?? p.full_name ?? p.email) + ': rol=' + (p.role ?? '-') + ', email=' + (p.email ?? '-'))
+  }
+  lines.push('')
 
-  return `=== PARK DATA (${new Date().toLocaleDateString('nl-NL')}) ===
+  // Optie verantwoordelijkheden
+  lines.push('OPTIE VERANTWOORDELIJKHEDEN:')
+  for (const k of optieKoppelingen) {
+    const cat = (k as Record<string, unknown>).vakman_categorieen as {naam: string} | null
+    lines.push((OPTIE_LABELS[k.optie_key] ?? k.optie_key) + ' -> ' + (cat?.naam ?? '-'))
+  }
+  lines.push('')
 
-KAVELS (${kavels.length} totaal):
-${kavelsText}
+  // Vakman types
+  lines.push('VAKMAN TYPES: ' + vakmanCat.map((c: {naam: string}) => c.naam).join(', '))
+  lines.push('')
 
-EIGENAREN (${owners.length} totaal):
-${ownersText}
+  // Afhankelijkheden
+  lines.push('AFHANKELIJKHEDEN:')
+  for (const d of deps) {
+    if (d.type === 'optie_optie') {
+      lines.push((OPTIE_LABELS[d.trigger_key] ?? d.trigger_key) + ' vereist ' + (OPTIE_LABELS[d.requires_key] ?? d.requires_key))
+    } else {
+      lines.push((STATUS_LABELS[d.trigger_key] ?? d.trigger_key) + ' vrijgeeft ' + (OPTIE_LABELS[d.requires_key] ?? d.requires_key))
+    }
+  }
+  lines.push('')
 
-TEAM (${profiles.length} gebruikers):
-${profilesText}
+  // Termijn config
+  lines.push('BETALINGSTERMIJNEN CONFIG:')
+  for (const t of termijnConfig) {
+    lines.push(t.naam + ': trigger=' + t.trigger + ', actief=' + t.actief)
+  }
 
-STATISTIEKEN:
-- Totaal kavels: ${kavels.length}
-- Verkocht: ${kavels.filter(k=>k.verkocht).length}
-- Beschikbaar: ${kavels.filter(k=>!k.verkocht).length}
-- Fases: ${[...new Set(kavels.map(k=>k.fase))].sort().join(', ')}
-`
+  return lines.join('\n')
 }
 
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json()
 
-    // Load prompt config
     const promptPath = path.join(process.cwd(), 'src/config/tessi-prompt.yaml')
     const promptConfig = yaml.load(fs.readFileSync(promptPath, 'utf8')) as {
       system_prompt: string
@@ -77,14 +165,13 @@ export async function POST(req: Request) {
       temperature: number
     }
 
-    // Get live park data
     const context = await getParkContext()
     const systemPrompt = promptConfig.system_prompt + '\n\n' + context
 
     const response = await fetch('https://api.together.xyz/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.TOGETHER_API_KEY}`,
+        'Authorization': 'Bearer ' + process.env.TOGETHER_API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

@@ -202,15 +202,39 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                 {OPTIES.map(({ key, label }) => {
                   const opties = k.opties as unknown as Record<string, unknown>
                   const isGekocht = opties?.[key + '_gekocht'] === true
+                  // Check afhankelijkheden: opties die vereist worden door deze optie
+                  const vereistKeys = deps.filter(d => d.type === 'optie_optie' && d.trigger_key === key).map(d => d.requires_key)
+                  // Check of deze optie vereist wordt door een andere aangevinkte optie
+                  const vereistDoorAangevinkt = deps.filter(d => d.type === 'optie_optie' && d.requires_key === key)
+                    .some(d => (k.opties as unknown as Record<string, unknown>)?.[d.trigger_key + '_gekocht'] === true)
+                  // Waarschuwing: aangevinkt maar vereiste optie niet aangevinkt
+                  const missingVereisten = isGekocht ? vereistKeys.filter(vk => !(k.opties as unknown as Record<string, unknown>)?.[vk + '_gekocht']) : []
                   return (
-                    <div key={key} onClick={() => setOptieField(key, 'gekocht', !isGekocht)}
+                    <div key={key} onClick={() => {
+                      const newVal = !isGekocht
+                      let updated = { ...k, opties: k.opties ? { ...k.opties, [key + '_gekocht']: newVal } : k.opties }
+                      // Auto-aanvinken van vereiste opties
+                      if (newVal && vereistKeys.length > 0) {
+                        vereistKeys.forEach(vk => {
+                          if (updated.opties) updated = { ...updated, opties: { ...updated.opties, [vk + '_gekocht']: true } }
+                        })
+                      }
+                      update(updated)
+                    }}
                       className={`flex items-center gap-2 px-2.5 py-2 rounded-[10px] cursor-pointer border transition-all
                         ${isGekocht
-                          ? 'bg-[rgba(48,209,88,0.08)] border-[rgba(48,209,88,0.25)] text-[#1a7a32]'
-                          : 'bg-[#f5f5f7] border-black/[0.05] text-[#6e6e73] hover:bg-[#e8e8ed]'
+                          ? missingVereisten.length > 0
+                            ? 'bg-[rgba(255,159,10,0.08)] border-[rgba(255,159,10,0.3)] text-[#a05a00]'
+                            : 'bg-[rgba(48,209,88,0.08)] border-[rgba(48,209,88,0.25)] text-[#1a7a32]'
+                          : vereistDoorAangevinkt
+                            ? 'bg-[rgba(48,209,88,0.08)] border-[rgba(48,209,88,0.25)] text-[#1a7a32]'
+                            : 'bg-[#f5f5f7] border-black/[0.05] text-[#6e6e73] hover:bg-[#e8e8ed]'
                         }`}>
-                      <Checkbox checked={isGekocht} color="green" size="sm" />
-                      <span className="text-[12px] font-medium">{label}</span>
+                      <Checkbox checked={isGekocht || vereistDoorAangevinkt} color="green" size="sm" />
+                      <span className="text-[12px] font-medium flex-1">{label}</span>
+                      {missingVereisten.length > 0 && (
+                        <span className="text-[11px] font-bold text-[#ff9f0a]" title={`Vereist: ${missingVereisten.map(vk => OPTIES.find(o=>o.key===vk)?.label ?? vk).join(', ')}`}>!</span>
+                      )}
                     </div>
                   )
                 })}
@@ -347,13 +371,18 @@ function EditField({ label, value, onChange }: { label: string; value: string; o
 }
 
 function Checkbox({ checked, color, size = 'md' }: { checked: boolean; color: 'blue' | 'green'; size?: 'sm' | 'md' }) {
-  const sz = size === 'sm' ? 'w-[15px] h-[15px] rounded-[4px]' : 'w-[17px] h-[17px] rounded-[5px]'
+  const sz = size === 'sm' ? 'w-[15px] h-[15px] rounded-[4px]' : 'w-[18px] h-[18px] rounded-[5px]'
   const bg = checked
     ? color === 'blue' ? 'bg-[#0071e3] border-[#0071e3]' : 'bg-[#30d158] border-[#30d158]'
-    : 'border-[#aeaeb2]'
+    : 'bg-white border-[#d1d1d6]'
+  const checkSize = size === 'sm' ? 9 : 11
   return (
-    <div className={`${sz} border-[1.5px] flex items-center justify-center transition-all flex-shrink-0 ${bg}`}>
-      {checked && <span className="text-white font-bold" style={{ fontSize: size === 'sm' ? 8 : 10 }}>v</span>}
+    <div className={`${sz} border-[1.5px] flex items-center justify-center transition-all flex-shrink-0 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)] ${bg}`}>
+      {checked && (
+        <svg width={checkSize} height={checkSize} viewBox="0 0 10 10" fill="none">
+          <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
     </div>
   )
 }

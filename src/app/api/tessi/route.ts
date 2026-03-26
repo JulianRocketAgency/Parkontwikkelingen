@@ -80,7 +80,7 @@ async function getParkContext() {
   for (const fase of faseNums) {
     const fk = kavels.filter(k => k.fase === fase)
     const gestart = faseStatussen.find(f => f.fase === fase)
-    lines.push('Fase ' + fase + ': ' + fk.length + ' kavels, ' + fk.filter(k=>k.verkocht).length + ' verkocht, ' + fk.filter(k=>k.kavel_status?.[0]?.opgeleverd).length + ' opgeleverd, gestart: ' + (gestart ? new Date(gestart.gestart_at).toLocaleDateString('nl-NL') : 'nee'))
+    lines.push('Fase ' + fase + ': ' + fk.length + ' kavels, ' + fk.filter(k=>k.verkocht).length + ' verkocht, ' + fk.filter(k => { const s = Array.isArray(k.kavel_status) ? k.kavel_status[0] : k.kavel_status; return s?.opgeleverd === true }).length + ' opgeleverd, gestart: ' + (gestart ? new Date(gestart.gestart_at).toLocaleDateString('nl-NL') : 'nee'))
   }
   lines.push('')
 
@@ -88,7 +88,8 @@ async function getParkContext() {
   lines.push('KAVELS (gedetailleerd):')
   for (const k of kavels) {
     const owner = owners.find(o => o.id === k.owner_id)
-    const status = k.kavel_status?.[0] ?? {}
+    const statusRaw = k.kavel_status
+    const status: Record<string, unknown> = (Array.isArray(statusRaw) ? statusRaw[0] : statusRaw) ?? {}
     const opties = k.kavel_opties?.[0] ?? {}
 
     const bouwGereed = Object.keys(STATUS_LABELS).filter(key => status[key] === true).map(key => STATUS_LABELS[key])

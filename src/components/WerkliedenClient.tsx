@@ -37,6 +37,7 @@ function initials(name: string) {
 
 export function WerkliedenClient({ profiles: initial, vakmanCategorieen }: Props) {
   const [profiles, setProfiles] = useState(initial)
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [toast, setToast] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ naam: '', email: '', wachtwoord: '', role: 'vakman', vakman_categorie_id: '' })
@@ -98,11 +99,13 @@ export function WerkliedenClient({ profiles: initial, vakmanCategorieen }: Props
           const members = grouped[role] ?? []
           return (
             <div key={role} className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] overflow-hidden">
-              <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-black/[0.05]">
+              <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-black/[0.05] cursor-pointer hover:bg-black/[0.02] transition-all select-none"
+                onClick={() => setCollapsed(prev => ({...prev, [role]: !prev[role]}))}>
+                <span className="text-[11px] text-[#aeaeb2] transition-transform" style={{display:'inline-block', transform: collapsed[role] ? 'rotate(-90deg)' : 'rotate(0deg)'}}>▼</span>
                 <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${ROLE_COLORS[role]}`}>{ROLE_LABELS[role]}</span>
                 <span className="text-[12px] text-[#aeaeb2]">{members.length} accounts</span>
               </div>
-              {members.length === 0 ? (
+              {!collapsed[role] && (members.length === 0 ? (
                 <div className="px-5 py-4 text-[13px] text-[#aeaeb2]">Geen accounts met deze rol</div>
               ) : (
                 <div className="divide-y divide-black/[0.05]">
@@ -142,7 +145,7 @@ export function WerkliedenClient({ profiles: initial, vakmanCategorieen }: Props
                     )
                   })}
                 </div>
-              )}
+              ))}
             </div>
           )
         })}

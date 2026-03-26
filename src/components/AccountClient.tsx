@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 interface Props {
@@ -14,6 +15,7 @@ export function AccountClient({ user, profile }: Props) {
   const [color, setColor] = useState(profile?.avatar_color ?? '#0071e3')
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
+  const router = useRouter()
   const supabase = createClient()
 
   function initials(name: string) {
@@ -31,6 +33,7 @@ export function AccountClient({ user, profile }: Props) {
       })
       setToast('Opgeslagen ✓')
       setTimeout(() => setToast(''), 2000)
+      router.refresh()
     } catch { setToast('Opslaan mislukt') }
     finally { setSaving(false) }
   }
@@ -124,7 +127,8 @@ export function AccountClient({ user, profile }: Props) {
           <div className="text-[15px] font-semibold mb-1">Wachtwoord</div>
           <div className="text-[13px] text-[#6e6e73] mb-4">Stuur een wachtwoord reset link naar je e-mailadres.</div>
           <button onClick={async () => {
-            const supabase = createClient()
+            const router = useRouter()
+  const supabase = createClient()
             await supabase.auth.resetPasswordForEmail(user.email ?? '')
             setToast('Reset link verstuurd naar ' + user.email)
           }}

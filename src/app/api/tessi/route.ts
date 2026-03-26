@@ -84,7 +84,7 @@ async function getParkContext() {
   for (const fase of faseNums) {
     const fk = kavels.filter(k => k.fase === fase)
     const gestart = faseStatussen.find(f => f.fase === fase)
-    lines.push('Fase ' + fase + ': ' + fk.length + ' kavels, ' + fk.filter(k=>k.verkocht).length + ' verkocht, ' + fk.filter(k => (allKavelStatus.find((s: Record<string, unknown>) => s.kavel_id === k.id) as Record<string,unknown>)?.opgeleverd === true).length + ' opgeleverd, gestart: ' + (gestart ? new Date(gestart.gestart_at).toLocaleDateString('nl-NL') : 'nee'))
+    lines.push('Fase ' + fase + ': ' + fk.length + ' kavels, ' + fk.filter(k=>k.verkocht).length + ' verkocht, ' + fk.filter(k => (allKavelStatus.find((s: any) => s.kavel_id === k.id) as any)?.opgeleverd === true).length + ' opgeleverd, gestart: ' + (gestart ? new Date(gestart.gestart_at).toLocaleDateString('nl-NL') : 'nee'))
   }
   lines.push('')
 
@@ -221,8 +221,7 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
-  const { data: kavels } = await supabase.from('kavels').select('id, number').eq('park_id', PARK_ID)
-  const { data: opties } = await supabase.from('kavel_opties').select('kavel_id, hottub_gekocht').eq('hottub_gekocht', true)
-  const matched = opties?.map(o => ({ ...o, number: kavels?.find(k => k.id === o.kavel_id)?.number }))
-  return Response.json({ matched })
+  const context = await getParkContext()
+  const lines = context.split('\n').filter(l => l.includes('hottub') || l.includes('Hottub'))
+  return Response.json({ lines, contextLength: context.length })
 }

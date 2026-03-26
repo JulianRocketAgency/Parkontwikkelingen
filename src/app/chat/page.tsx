@@ -13,7 +13,7 @@ export default async function ChatPage() {
     supabase.from('berichten').select('*').eq('park_id', PARK_ID).order('created_at', { ascending: true }),
     supabase.from('owners').select('*').eq('park_id', PARK_ID),
     supabase.from('profiles').select('*').eq('id', user.id).single(),
-    supabase.from('profiles').select('*').neq('id', user.id),
+    supabase.from('profiles').select('*, vakman_categorieen(naam)').neq('id', user.id),
   ])
 
   return (

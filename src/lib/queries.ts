@@ -483,3 +483,32 @@ export async function deleteVakmanCategorie(id: string): Promise<void> {
   const supabase = createClient()
   await supabase.from('vakman_categorieen').delete().eq('id', id)
 }
+
+// ── Optie-vakman koppelingen ──────────────────────────────────
+export interface OptieVakmanKoppeling {
+  id: string
+  park_id: string
+  optie_key: string
+  vakman_categorie_id: string
+}
+
+export async function getOptieVakmanKoppelingen(parkId: string): Promise<OptieVakmanKoppeling[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('optie_vakman_koppelingen')
+    .select('*')
+    .eq('park_id', parkId)
+  return data ?? []
+}
+
+export async function upsertOptieVakmanKoppeling(parkId: string, optieKey: string, vakmanCategorieId: string): Promise<void> {
+  const supabase = createClient()
+  if (!vakmanCategorieId) {
+    await supabase.from('optie_vakman_koppelingen').delete().eq('park_id', parkId).eq('optie_key', optieKey)
+    return
+  }
+  await supabase.from('optie_vakman_koppelingen').upsert(
+    { park_id: parkId, optie_key: optieKey, vakman_categorie_id: vakmanCategorieId },
+    { onConflict: 'park_id,optie_key' }
+  )
+}

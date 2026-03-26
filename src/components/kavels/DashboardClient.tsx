@@ -18,12 +18,14 @@ interface Props {
   faseStatussen: FaseStatus[]
   termijnConfig: TermijnConfig[]
   betalingen: Betalingstermijn[]
+  vakmanCategorieen?: { id: string; naam: string }[]
+  optieKoppelingen?: Record<string, string>
 }
 
 const PARK_ID = '11111111-0000-0000-0000-000000000001'
 const TERMIJN_VOLGORDE_KEYS = ['eerste_termijn','doorgang_fase','bouw_gestart','transport','geplaatst','gereed_oplevering','opgeleverd']
 
-export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen: initialFaseStatussen, termijnConfig, betalingen: initialBetalingen }: Props) {
+export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen: initialFaseStatussen, termijnConfig, betalingen: initialBetalingen, vakmanCategorieen = [], optieKoppelingen = {} }: Props) {
   const [kavels, setKavels] = useState(initial)
   const [faseStatussen, setFaseStatussen] = useState(initialFaseStatussen)
   const [betalingen, setBetalingen] = useState(initialBetalingen)
@@ -279,7 +281,9 @@ export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen
           onClose={() => { setPanelOpen(false); setSelectedId(null) }}
           onUpdate={updateKavelLocal}
           onVerkoop={(kavelId) => { setVerkoopModal(kavelId); setVerkoopOwnerId('') }}
-          onBetalingTriggered={(b) => setBetalingen(prev => [...prev, b])} />
+          onBetalingTriggered={(b) => setBetalingen(prev => [...prev, b])}
+          vakmanCategorieen={vakmanCategorieen}
+          optieKoppelingen={optieKoppelingen} />
       )}
 
       {verkoopModal && (

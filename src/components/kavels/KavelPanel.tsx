@@ -17,6 +17,8 @@ interface Props {
   onUpdate: (k: Kavel) => void
   onVerkoop: (kavelId: string) => void
   onBetalingTriggered: (b: Betalingstermijn) => void
+  vakmanCategorieen?: { id: string; naam: string }[]
+  optieKoppelingen?: Record<string, string>
 }
 
 const TRIGGER_MAP: Record<string, string> = {

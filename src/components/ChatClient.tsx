@@ -30,7 +30,7 @@ interface Colleague {
   avatar_color: string | null
 }
 
-type Contact = { id: string; name: string; color: string; email: string | null; type: 'algemeen' | 'collega' | 'eigenaar' }
+type Contact = { id: string; name: string; color: string; email: string | null; type: 'algemeen' | 'collega' | 'eigenaar'; vakmanLabel?: string }
 
 interface Props {
   berichten: Bericht[]
@@ -122,21 +122,27 @@ export function ChatClient({ berichten: initial, owners, colleagues, currentUser
     else grouped.push({ date: d, items: [b] })
   })
 
-  const colleagueContacts: Contact[] = colleagues.map(c => ({
-    id: c.id,
-    name: c.naam ?? c.full_name ?? c.email ?? 'Gebruiker',
-    color: c.avatar_color ?? '#6e6e73',
-    email: c.email,
-    type: 'collega',
-  }))
+  const colleagueContacts: Contact[] = colleagues.map(c => {
+    const vakmanCat = (c as unknown as Record<string,unknown>).vakman_categorie_id
+      ? (colleagues as unknown as Record<string,unknown>[]).find(() => false)
+      : undefined
+    return {
+      id: c.id,
+      name: c.naam ?? c.full_name ?? c.email ?? 'Gebruiker',
+      color: c.avatar_color ?? '#6e6e73',
+      email: c.email,
+      type: 'collega' as const,
+      vakmanLabel: (c as unknown as {vakman_categorie_naam?: string}).vakman_categorie_naam,
+    }
+  }).sort((a,b) => a.name.localeCompare(b.name, 'nl'))
 
   const ownerContacts: Contact[] = owners.map(o => ({
     id: o.id,
     name: o.name,
     color: o.color,
     email: o.email,
-    type: 'eigenaar',
-  }))
+    type: 'eigenaar' as const,
+  })).sort((a,b) => a.name.localeCompare(b.name, 'nl'))
 
   function filterContact(c: Contact) {
     if (filter === 'unread') return unreadCount(c) > 0

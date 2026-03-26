@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getPark, getKavels, getParkMaps, getFaseStatussen, getTermijnConfig, getBetalingen } from '@/lib/queries'
+import { getPark, getKavels, getParkMaps, getFaseStatussen, getTermijnConfig, getBetalingen, getVakmanCategorieen, getOptieVakmanKoppelingen } from '@/lib/queries'
 import { DashboardClient } from '@/components/kavels/DashboardClient'
 import { redirect } from 'next/navigation'
 
@@ -10,13 +10,15 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [park, kavels, parkMaps, faseStatussen, termijnConfig, betalingen] = await Promise.all([
+  const [park, kavels, parkMaps, faseStatussen, termijnConfig, betalingen, vakmanCategorieen, koppelingen] = await Promise.all([
     getPark(PARK_ID),
     getKavels(PARK_ID),
     getParkMaps(PARK_ID),
     getFaseStatussen(PARK_ID),
     getTermijnConfig(PARK_ID),
     getBetalingen(PARK_ID),
+    getVakmanCategorieen(PARK_ID),
+    getOptieVakmanKoppelingen(PARK_ID),
   ])
 
   return (
@@ -27,6 +29,8 @@ export default async function DashboardPage() {
       faseStatussen={faseStatussen}
       termijnConfig={termijnConfig}
       betalingen={betalingen}
+      vakmanCategorieen={vakmanCategorieen}
+      optieKoppelingen={Object.fromEntries(koppelingen.map(k => [k.optie_key, k.vakman_categorie_id]))}
     />
   )
 }

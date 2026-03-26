@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { OPTIES } from '@/types'
 import {
   createVakmanCategorie, deleteVakmanCategorie,
+  upsertOptieVakmanKoppeling,
   type VakmanCategorie,
 } from '@/lib/queries'
 
@@ -74,17 +75,20 @@ export function CategorieenClient({ vakmanCategorieen: initialVC, optieKoppeling
       {/* Opties toewijzen */}
       <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-3">Opties toewijzen aan vakman</div>
       <div className="grid grid-cols-2 gap-2">
-        {OPTIES.map(({ key, label }) => {
+        {[...OPTIES].sort((a,b) => a.label.localeCompare(b.label, 'nl')).map(({ key, label }) => {
           const selected = vakmanCategorieen.find(c => c.id === optieKoppelingen[key])
           return (
             <div key={key} className={`flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 border transition-all
               ${selected ? 'bg-[rgba(255,159,10,0.06)] border-[rgba(255,159,10,0.2)]' : 'bg-[#f5f5f7] border-black/[0.05]'}`}>
               <span className="text-[12px] font-medium text-[#3a3a3c] flex-1">{label}</span>
               <select value={optieKoppelingen[key] ?? ''}
-                onChange={e => onOptieKoppelingChange(key, e.target.value)}
+                onChange={async e => {
+                onOptieKoppelingChange(key, e.target.value)
+                await upsertOptieVakmanKoppeling(PARK_ID, key, e.target.value)
+              }}
                 className="bg-white border border-black/[0.08] rounded-[8px] px-2 py-1 text-[11px] outline-none focus:border-[#0071e3] transition-all text-[#3a3a3c]">
                 <option value="">— Geen —</option>
-                {vakmanCategorieen.map(c => <option key={c.id} value={c.id}>{c.naam}</option>)}
+                {[...vakmanCategorieen].sort((a,b) => a.naam.localeCompare(b.naam, 'nl')).map(c => <option key={c.id} value={c.id}>{c.naam}</option>)}
               </select>
             </div>
           )

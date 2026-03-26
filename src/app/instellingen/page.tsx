@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getPark, getKavels, getParkMaps, getOptieCategorieen, getVakmanCategorieen } from '@/lib/queries'
+import { getPark, getKavels, getParkMaps, getOptieCategorieen, getVakmanCategorieen, getOptieVakmanKoppelingen } from '@/lib/queries'
 import { InstellingenClient } from '@/components/InstellingenClient'
 import { redirect } from 'next/navigation'
 
@@ -10,13 +10,14 @@ export default async function InstellingenPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [park, kavels, parkMaps, allParks, optieCategorieen, vakmanCategorieen] = await Promise.all([
+  const [park, kavels, parkMaps, allParks, optieCategorieen, vakmanCategorieen, koppelingen] = await Promise.all([
     getPark(PARK_ID),
     getKavels(PARK_ID),
     getParkMaps(PARK_ID),
     supabase.from('parks').select('id, name').then(r => r.data ?? []),
     getOptieCategorieen(PARK_ID),
     getVakmanCategorieen(PARK_ID),
+    getOptieVakmanKoppelingen(PARK_ID),
   ])
 
   return (
@@ -27,6 +28,7 @@ export default async function InstellingenPage() {
       allParks={allParks}
       optieCategorieen={optieCategorieen}
       vakmanCategorieen={vakmanCategorieen}
+      initialKoppelingen={Object.fromEntries(koppelingen.map(k => [k.optie_key, k.vakman_categorie_id]))}
     />
   )
 }

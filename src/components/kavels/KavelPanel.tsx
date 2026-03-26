@@ -210,30 +210,18 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                   // Waarschuwing: aangevinkt maar vereiste optie niet aangevinkt
                   const missingVereisten = isGekocht ? vereistKeys.filter(vk => !(k.opties as unknown as Record<string, unknown>)?.[vk + '_gekocht']) : []
                   return (
-                    <div key={key} onClick={() => {
-                      const newVal = !isGekocht
-                      let updated = { ...k, opties: k.opties ? { ...k.opties, [key + '_gekocht']: newVal } : k.opties }
-                      // Auto-aanvinken van vereiste opties
-                      if (newVal && vereistKeys.length > 0) {
-                        vereistKeys.forEach(vk => {
-                          if (updated.opties) updated = { ...updated, opties: { ...updated.opties, [vk + '_gekocht']: true } }
-                        })
-                      }
-                      update(updated)
-                    }}
+                    <div key={key} onClick={() => setOptieField(key, 'gekocht', !isGekocht)}
                       className={`flex items-center gap-2 px-2.5 py-2 rounded-[10px] cursor-pointer border transition-all
                         ${isGekocht
-                          ? missingVereisten.length > 0
-                            ? 'bg-[rgba(255,159,10,0.08)] border-[rgba(255,159,10,0.3)] text-[#a05a00]'
-                            : 'bg-[rgba(48,209,88,0.08)] border-[rgba(48,209,88,0.25)] text-[#1a7a32]'
+                          ? 'bg-[rgba(48,209,88,0.08)] border-[rgba(48,209,88,0.25)] text-[#1a7a32]'
                           : vereistDoorAangevinkt
-                            ? 'bg-[rgba(48,209,88,0.08)] border-[rgba(48,209,88,0.25)] text-[#1a7a32]'
+                            ? 'bg-[rgba(255,59,48,0.06)] border-[rgba(255,59,48,0.2)] text-[#6e6e73]'
                             : 'bg-[#f5f5f7] border-black/[0.05] text-[#6e6e73] hover:bg-[#e8e8ed]'
                         }`}>
                       <Checkbox checked={isGekocht || vereistDoorAangevinkt} color="green" size="sm" />
                       <span className="text-[12px] font-medium flex-1">{label}</span>
-                      {missingVereisten.length > 0 && (
-                        <span className="text-[11px] font-bold text-[#ff9f0a]" title={`Vereist: ${missingVereisten.map(vk => OPTIES.find(o=>o.key===vk)?.label ?? vk).join(', ')}`}>!</span>
+                      {vereistDoorAangevinkt && !isGekocht && (
+                        <span className="w-4 h-4 rounded-full bg-[#ff3b30] flex items-center justify-center text-white font-bold flex-shrink-0" style={{fontSize:9}}>!</span>
                       )}
                     </div>
                   )

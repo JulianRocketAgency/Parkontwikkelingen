@@ -12,12 +12,20 @@ const STATUS_LABELS: Record<string, string> = {
   opgestart: 'Opgestart', itt_aangesloten: 'ITT aangesloten',
   intern_opgeleverd: 'Intern opgeleverd', opgeleverd: 'Opgeleverd',
 }
+
+const OPTIE_KEYS = [
+  'meubels', 'spec_meubels', 'tuinaanleg', 'marindex', 'madino',
+  'airco', 'pergola', 'hottub', 'horren', 'loungeset',
+  'zitkuil', 'berging', 'zonnepanelen'
+]
+
 const OPTIE_LABELS: Record<string, string> = {
   meubels: 'Meubels', spec_meubels: 'Spec. meubels', tuinaanleg: 'Tuinaanleg',
   marindex: 'Marindex', madino: 'Madino', airco: 'Airco', pergola: 'Pergola',
   hottub: 'Hottub', horren: 'Horren', loungeset: 'Loungeset', zitkuil: 'Zitkuil',
   berging: 'Berging', zonnepanelen: 'Zonnepanelen',
 }
+
 const TERMIJN_VOLGORDE = ['eerste_termijn','doorgang_fase','bouw_gestart','transport','geplaatst','gereed_oplevering','opgeleverd']
 
 async function getParkContext() {
@@ -50,8 +58,7 @@ async function getParkContext() {
   const optieKoppelingen = optieKoppelingenRes.data ?? []
 
   const lines: string[] = []
-
-  lines.push('=== PARKBOUW DATA ===')
+  lines.push('=== PARKBOUW DATA (' + new Date().toLocaleDateString('nl-NL', {day:'numeric',month:'long',year:'numeric'}) + ') ===')
   lines.push('')
 
   // Statistieken
@@ -73,32 +80,39 @@ async function getParkContext() {
   for (const fase of faseNums) {
     const fk = kavels.filter(k => k.fase === fase)
     const gestart = faseStatussen.find(f => f.fase === fase)
-    const vk = fk.filter(k => k.verkocht).length
-    const ok = fk.filter(k => k.kavel_status?.[0]?.opgeleverd === true).length
-    lines.push('Fase ' + fase + ': ' + fk.length + ' kavels, ' + vk + ' verkocht, ' + ok + ' opgeleverd, gestart: ' + (gestart ? new Date(gestart.gestart_at).toLocaleDateString('nl-NL') : 'nee'))
+    lines.push('Fase ' + fase + ': ' + fk.length + ' kavels, ' + fk.filter(k=>k.verkocht).length + ' verkocht, ' + fk.filter(k=>k.kavel_status?.[0]?.opgeleverd).length + ' opgeleverd, gestart: ' + (gestart ? new Date(gestart.gestart_at).toLocaleDateString('nl-NL') : 'nee'))
   }
   lines.push('')
 
-  // Kavels
-  lines.push('KAVELS:')
+  // Kavels gedetailleerd
+  lines.push('KAVELS (gedetailleerd):')
   for (const k of kavels) {
     const owner = owners.find(o => o.id === k.owner_id)
     const status = k.kavel_status?.[0] ?? {}
     const opties = k.kavel_opties?.[0] ?? {}
+
     const bouwGereed = Object.keys(STATUS_LABELS).filter(key => status[key] === true).map(key => STATUS_LABELS[key])
-    const optiesBesteld = Object.keys(OPTIE_LABELS).filter(key => opties[key + '_besteld'] === true).map(key => OPTIE_LABELS[key])
-    const optiesGereed = Object.keys(OPTIE_LABELS).filter(key => opties[key + '_gereed'] === true).map(key => OPTIE_LABELS[key])
+    const pct = Math.round(bouwGereed.length / Object.keys(STATUS_LABELS).length * 100)
+
+    const optiesGekocht = OPTIE_KEYS.filter(key => opties[key + '_gekocht'] === true).map(key => OPTIE_LABELS[key])
+    const optiesBesteld = OPTIE_KEYS.filter(key => opties[key + '_besteld'] === true).map(key => OPTIE_LABELS[key])
+    const optiesGereed = OPTIE_KEYS.filter(key => opties[key + '_gereed'] === true).map(key => OPTIE_LABELS[key])
+    const optiesNogNietBesteld = optiesGekocht.filter(l => !optiesBesteld.includes(l))
+
     const kBet = betalingen.filter(b => b.kavel_id === k.id)
     const maxTermijn = TERMIJN_VOLGORDE.reduce((best, key) => kBet.find(b => b.termijn_key === key) ? key : best, 'geen')
-    const pct = Math.round(bouwGereed.length / Object.keys(STATUS_LABELS).length * 100)
+
     lines.push('Kavel #' + k.number + ' (Fase ' + k.fase + ', ' + k.type + ', ' + k.uitvoering + '):')
     lines.push('  Verkocht: ' + (k.verkocht ? 'ja' : 'nee') + ', Eigenaar: ' + (owner?.name ?? 'geen'))
-    lines.push('  Bouwvoortgang: ' + pct + '% - Gereed: ' + (bouwGereed.join(', ') || 'geen'))
+    lines.push('  Bouwvoortgang: ' + pct + '% - Gereed stappen: ' + (bouwGereed.join(', ') || 'geen'))
+    lines.push('  Opties gekocht: ' + (optiesGekocht.join(', ') || 'geen'))
     lines.push('  Opties besteld: ' + (optiesBesteld.join(', ') || 'geen'))
-    lines.push('  Opties gereed: ' + (optiesGereed.join(', ') || 'geen'))
-    lines.push('  Betalingstermijn: ' + maxTermijn + ' (' + kBet.length + '/7 termijnen)')
+    lines.push('  Opties gereed/geplaatst: ' + (optiesGereed.join(', ') || 'geen'))
+    lines.push('  Opties gekocht maar nog niet besteld: ' + (optiesNogNietBesteld.join(', ') || 'geen'))
+    lines.push('  Huidige betalingstermijn: ' + maxTermijn + ' (' + kBet.length + '/7)')
     if (k.notitie) lines.push('  Notitie: ' + k.notitie)
     if (k.transport_date) lines.push('  Transportdatum: ' + k.transport_date)
+    if (k.chassis) lines.push('  Chassis: ' + k.chassis)
   }
   lines.push('')
 
@@ -111,6 +125,8 @@ async function getParkContext() {
     lines.push('  Email: ' + (o.email ?? '-') + ', Telefoon: ' + (o.phone ?? '-'))
     lines.push('  Kavels: ' + (kv.map(k => '#' + k.number).join(', ') || 'geen'))
     lines.push('  Betalingen: ' + oBet.filter(b => b.status === 'voldaan').length + '/' + oBet.length + ' voldaan')
+    const openBet = oBet.filter(b => b.status === 'actief')
+    if (openBet.length > 0) lines.push('  Openstaande termijnen: ' + openBet.map(b => b.naam).join(', '))
   }
   lines.push('')
 
@@ -121,11 +137,11 @@ async function getParkContext() {
   }
   lines.push('')
 
-  // Optie verantwoordelijkheden
-  lines.push('OPTIE VERANTWOORDELIJKHEDEN:')
+  // Optie-vakman verantwoordelijkheden
+  lines.push('OPTIE VERANTWOORDELIJKHEDEN (welke vakman doet wat):')
   for (const k of optieKoppelingen) {
     const cat = (k as Record<string, unknown>).vakman_categorieen as {naam: string} | null
-    lines.push((OPTIE_LABELS[k.optie_key] ?? k.optie_key) + ' -> ' + (cat?.naam ?? '-'))
+    lines.push((OPTIE_LABELS[k.optie_key] ?? k.optie_key) + ' -> ' + (cat?.naam ?? 'niet toegewezen'))
   }
   lines.push('')
 
@@ -134,18 +150,18 @@ async function getParkContext() {
   lines.push('')
 
   // Afhankelijkheden
-  lines.push('AFHANKELIJKHEDEN:')
+  lines.push('AFHANKELIJKHEDEN TUSSEN OPTIES:')
   for (const d of deps) {
     if (d.type === 'optie_optie') {
-      lines.push((OPTIE_LABELS[d.trigger_key] ?? d.trigger_key) + ' vereist ' + (OPTIE_LABELS[d.requires_key] ?? d.requires_key))
+      lines.push((OPTIE_LABELS[d.trigger_key] ?? d.trigger_key) + ' vereist ook: ' + (OPTIE_LABELS[d.requires_key] ?? d.requires_key))
     } else {
-      lines.push((STATUS_LABELS[d.trigger_key] ?? d.trigger_key) + ' vrijgeeft ' + (OPTIE_LABELS[d.requires_key] ?? d.requires_key))
+      lines.push('Bouwstap ' + (STATUS_LABELS[d.trigger_key] ?? d.trigger_key) + ' vrijgeeft optie: ' + (OPTIE_LABELS[d.requires_key] ?? d.requires_key))
     }
   }
   lines.push('')
 
-  // Termijn config
-  lines.push('BETALINGSTERMIJNEN CONFIG:')
+  // Termijn configuratie
+  lines.push('BETALINGSTERMIJNEN CONFIGURATIE:')
   for (const t of termijnConfig) {
     lines.push(t.naam + ': trigger=' + t.trigger + ', actief=' + t.actief)
   }

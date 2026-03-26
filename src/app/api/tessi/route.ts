@@ -35,16 +35,18 @@ async function getParkContext() {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  const [kavelsRes, ownersRes, betalingenRes, profilesRes, faseRes, termijnConfigRes, depsRes, vakmanCatRes, optieKoppelingenRes] = await Promise.all([
-    supabase.from('kavels').select('*, kavel_status(*), kavel_opties(*)').eq('park_id', PARK_ID),
+  const [kavelsRes, ownersRes, betalingenRes, profilesRes, faseRes, termijnConfigRes, depsRes, vakmanCatRes, optieKoppelingenRes, kavelStatusRes, kavelOptiesRes] = await Promise.all([
+    supabase.from('kavels').select('*').eq('park_id', PARK_ID),
     supabase.from('owners').select('*').eq('park_id', PARK_ID),
     supabase.from('betalingstermijnen').select('*'),
-    supabase.from('profiles').select('*').eq('park_id', PARK_ID),
+    supabase.from('profiles').select('*'),
     supabase.from('fase_status').select('*').eq('park_id', PARK_ID),
     supabase.from('termijn_config').select('*').eq('park_id', PARK_ID).order('volgorde'),
     supabase.from('dependencies').select('*').eq('park_id', PARK_ID),
     supabase.from('vakman_categorieen').select('*').eq('park_id', PARK_ID),
     supabase.from('optie_vakman_koppelingen').select('*, vakman_categorieen(naam)').eq('park_id', PARK_ID),
+    supabase.from('kavel_status').select('*'),
+    supabase.from('kavel_opties').select('*'),
   ])
 
   const kavels = kavelsRes.data ?? []
@@ -56,6 +58,8 @@ async function getParkContext() {
   const deps = depsRes.data ?? []
   const vakmanCat = vakmanCatRes.data ?? []
   const optieKoppelingen = optieKoppelingenRes.data ?? []
+  const allKavelStatus = kavelStatusRes.data ?? []
+  const allKavelOpties = kavelOptiesRes.data ?? []
 
   const lines: string[] = []
   lines.push('=== PARKBOUW DATA (' + new Date().toLocaleDateString('nl-NL', {day:'numeric',month:'long',year:'numeric'}) + ') ===')
@@ -80,7 +84,7 @@ async function getParkContext() {
   for (const fase of faseNums) {
     const fk = kavels.filter(k => k.fase === fase)
     const gestart = faseStatussen.find(f => f.fase === fase)
-    lines.push('Fase ' + fase + ': ' + fk.length + ' kavels, ' + fk.filter(k=>k.verkocht).length + ' verkocht, ' + fk.filter(k => { const s = Array.isArray(k.kavel_status) ? k.kavel_status[0] : k.kavel_status; return s?.opgeleverd === true }).length + ' opgeleverd, gestart: ' + (gestart ? new Date(gestart.gestart_at).toLocaleDateString('nl-NL') : 'nee'))
+    lines.push('Fase ' + fase + ': ' + fk.length + ' kavels, ' + fk.filter(k=>k.verkocht).length + ' verkocht, ' + fk.filter(k => (allKavelStatus.find((s: Record<string, unknown>) => s.kavel_id === k.id) as Record<string,unknown>)?.opgeleverd === true).length + ' opgeleverd, gestart: ' + (gestart ? new Date(gestart.gestart_at).toLocaleDateString('nl-NL') : 'nee'))
   }
   lines.push('')
 

@@ -28,7 +28,7 @@ const TRIGGER_MAP: Record<string, string> = {
   opgeleverd:        'opgeleverd',
 }
 
-export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, onVerkoop, onBetalingTriggered }: Props) {
+export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, onVerkoop, onBetalingTriggered, vakmanCategorieen = [], optieKoppelingen = {} }: Props) {
   const [k, setK] = useState(kavel)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)

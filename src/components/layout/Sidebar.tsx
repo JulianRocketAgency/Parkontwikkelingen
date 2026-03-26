@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { User } from 'lucide-react'
 import { usePathname } from 'next/navigation'
-import { LayoutGrid, Users, Settings, MessageCircle, HardHat } from 'lucide-react'
+import { LayoutGrid, Users, Settings, MessageCircle, HardHat, Bot } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -11,6 +11,7 @@ const navItems = [
   { href: '/eigenaren',    label: 'Eigenaren',    icon: Users },
   { href: '/werklieden',   label: 'Werklieden',   icon: HardHat },
   { href: '/chat',         label: 'Chat',         icon: MessageCircle },
+  { href: '/tessi',        label: 'Tessi',        icon: Bot },
   { href: '/instellingen', label: 'Instellingen', icon: Settings },
 ]
 

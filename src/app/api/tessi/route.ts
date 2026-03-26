@@ -214,9 +214,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply: 'Er is een fout opgetreden.' }, { status: 500 })
   }
 }
-// DEBUG - remove later
+// DEBUG
 export async function GET() {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+  const { data: opties } = await supabase.from('kavel_opties').select('kavel_id, hottub_gekocht, airco_gekocht, meubels_gekocht').limit(5)
   const context = await getParkContext()
-  const hottubLines = context.split('\n').filter(l => l.toLowerCase().includes('hottub'))
-  return Response.json({ hottubLines, contextLength: context.length })
+  const kavelsLines = context.split('\n').filter(l => l.includes('Kavel #') || l.includes('Opties gekocht'))
+  return Response.json({ opties, kavelsLines, contextLength: context.length })
 }

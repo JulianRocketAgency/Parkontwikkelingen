@@ -9,5 +9,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
   if (!profile?.is_admin) redirect('/dashboard')
   
-  return <>{children}</>
+  // Eigen layout zonder sidebar
+  return (
+    <html lang="nl">
+      <body className="bg-[#f5f5f7] min-h-screen">
+        {children}
+      </body>
+    </html>
+  )
 }

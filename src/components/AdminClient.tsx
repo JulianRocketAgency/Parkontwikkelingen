@@ -253,7 +253,13 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
         const a = addons.find(a => a.id === oa.addon_id)
         return s + (a?.prijs_per_maand ?? 0) * oa.aantal
       }, 0)
-    return sum + (p?.prijs_per_maand ?? 0) + addonMRR
+    const realAddonMRR = orgAddons
+      .filter(oa => oa.organisatie_id === o.id && oa.aantal > 0)
+      .reduce((s, oa) => {
+        const a = addons.find(a => a.id === oa.addon_id)
+        return s + (a?.prijs_per_maand ?? 0) * oa.aantal
+      }, 0)
+    return sum + (p?.prijs_per_maand ?? 0) + realAddonMRR
   }, 0)
 
   const navItems = [

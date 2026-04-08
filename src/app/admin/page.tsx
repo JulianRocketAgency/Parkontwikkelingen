@@ -1,14 +1,19 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { AdminClient } from '@/components/AdminClient'
 
 export default async function AdminPage() {
-  const supabase = await createClient()
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
 
-  const [orgsRes, parksRes, profilesRes, adminsRes] = await Promise.all([
+  const [orgsRes, parksRes, profilesRes, adminsRes, pakkettenRes] = await Promise.all([
     supabase.from('organisaties').select('*').order('created_at', { ascending: false }),
-    supabase.from('parks').select('*, organisaties(naam)').order('created_at', { ascending: false }),
+    supabase.from('parks').select('*').order('created_at', { ascending: false }),
     supabase.from('profiles').select('*').order('created_at', { ascending: false }),
     supabase.from('platform_admins').select('*'),
+    supabase.from('licentie_pakketten').select('*').eq('actief', true).order('prijs_per_maand'),
   ])
 
   return (
@@ -17,6 +22,7 @@ export default async function AdminPage() {
       parks={parksRes.data ?? []}
       profiles={profilesRes.data ?? []}
       admins={adminsRes.data ?? []}
+      pakketten={pakkettenRes.data ?? []}
     />
   )
 }

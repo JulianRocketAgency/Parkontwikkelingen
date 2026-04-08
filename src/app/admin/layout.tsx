@@ -1,6 +1,9 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
+
+export const metadata: Metadata = { title: 'ParkBouw Admin' }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -23,7 +26,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <html lang="nl">
-      <body className="bg-[#f5f5f7] min-h-screen">
+      <body className="bg-[#f2f2f7] min-h-screen" style={{fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
         {children}
       </body>
     </html>

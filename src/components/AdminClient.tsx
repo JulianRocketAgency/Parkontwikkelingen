@@ -612,7 +612,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                           <div className="text-[13px] font-semibold">{org.naam}</div>
                           <span className={"text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize " + (PAKKET_COLORS[org.licentie_type] ?? '')}>{org.licentie_type}</span>
                         </div>
-                        {addonMRR > 0 && <div className="text-[13px] font-semibold text-[#0071e3]">+€{addonMRR}/mnd</div>}
+
                       </div>
 
                       {/* Gebruik overzicht */}

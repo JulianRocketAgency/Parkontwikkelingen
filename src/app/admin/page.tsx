@@ -4,10 +4,11 @@ import { AdminClient } from '@/components/AdminClient'
 export default async function AdminPage() {
   const supabase = await createClient()
 
-  const [orgsRes, parksRes, profilesRes] = await Promise.all([
+  const [orgsRes, parksRes, profilesRes, adminsRes] = await Promise.all([
     supabase.from('organisaties').select('*').order('created_at', { ascending: false }),
     supabase.from('parks').select('*, organisaties(naam)').order('created_at', { ascending: false }),
     supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+    supabase.from('platform_admins').select('*'),
   ])
 
   return (
@@ -15,6 +16,7 @@ export default async function AdminPage() {
       organisaties={orgsRes.data ?? []}
       parks={parksRes.data ?? []}
       profiles={profilesRes.data ?? []}
+      admins={adminsRes.data ?? []}
     />
   )
 }

@@ -244,7 +244,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                 { label: 'Klanten', value: String(organisaties.length), sub: organisaties.filter(o=>o.status==='actief').length + ' actief' },
                 { label: 'Parken', value: String(parks.length), sub: 'totaal' },
                 { label: 'Gebruikers', value: String(profiles.length), sub: 'accounts' },
-                { label: 'MRR', value: 'EUR' + totalMRR, sub: 'per maand' },
+                { label: 'MRR', value: '€' + totalMRR, sub: 'per maand' },
               ].map(({ label, value, sub }) => (
                 <div key={label} className="bg-white rounded-[16px] px-5 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05]">
                   <div className="text-[12px] text-[#6e6e73] font-medium mb-1">{label}</div>
@@ -283,7 +283,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                       <div key={p.id}>
                         <div className="flex justify-between text-[13px] mb-1">
                           <span className="font-medium">{p.naam}</span>
-                          <span className="text-[#6e6e73]">{count} klanten · EUR{p.prijs_per_maand}/mnd</span>
+                          <span className="text-[#6e6e73]">{count} klanten · €{p.prijs_per_maand}/mnd</span>
                         </div>
                         <div className="h-1.5 bg-[#f5f5f7] rounded-full overflow-hidden">
                           <div className="h-full bg-[#0071e3] rounded-full" style={{width: pct + '%'}} />
@@ -412,7 +412,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                       <span className={"text-[11px] font-semibold px-2.5 py-1 rounded-full capitalize " + (PAKKET_COLORS[p.slug] ?? '')}>{p.naam}</span>
                       <span className="text-[12px] text-[#6e6e73]">{count} klanten</span>
                     </div>
-                    <div className="text-[32px] font-bold tracking-[-1px] mb-0.5">EUR{p.prijs_per_maand}</div>
+                    <div className="text-[32px] font-bold tracking-[-1px] mb-0.5">€{p.prijs_per_maand}</div>
                     <div className="text-[12px] text-[#6e6e73] mb-4">per maand</div>
                     <div className="flex flex-col gap-2 mb-4">
                       {p.features.map(f => (
@@ -531,7 +531,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                 <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Licentie pakket</label>
                 <select value={form.licentie_type} onChange={e => setForm(p => ({...p, licentie_type: e.target.value}))}
                   className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] transition-all">
-                  {pakketten.map(p => <option key={p.id} value={p.slug}>{p.naam} — EUR{p.prijs_per_maand}/mnd</option>)}
+                  {pakketten.map(p => <option key={p.id} value={p.slug}>{p.naam} — €{p.prijs_per_maand}/mnd</option>)}
                 </select>
               </div>
               {error && <div className="text-[12px] text-[#ff3b30] bg-[rgba(255,59,48,0.08)] rounded-[8px] px-3 py-2">{error}</div>}

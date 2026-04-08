@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     )
     const { data, error } = await supabase
       .from('organisaties')
-      .update({ naam, email, telefoon, adres, status, licentie_type, licentie_tot, max_parken, max_gebruikers, extra_parken, extra_gebruikers, notities })
+      .update({ naam, email, telefoon, adres, status, licentie_type, licentie_tot: licentie_tot || null, max_parken, max_gebruikers, extra_parken, extra_gebruikers, notities })
       .eq('id', id)
       .select().single()
     if (error) throw new Error(error.message)

@@ -613,7 +613,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Naam" value={String(editPakketForm.naam ?? '')} onChange={v => setEditPakketForm(p => ({...p, naam: v}))} />
-                <NumField label="Prijs per maand (EUR)" value={Number(editPakketForm.prijs_per_maand ?? 0)} onChange={v => setEditPakketForm(p => ({...p, prijs_per_maand: v}))} />
+                <NumField label="Prijs per maand (€)" value={Number(editPakketForm.prijs_per_maand ?? 0)} onChange={v => setEditPakketForm(p => ({...p, prijs_per_maand: v}))} />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <NumField label="Max parken" value={Number(editPakketForm.max_parken ?? 0)} onChange={v => setEditPakketForm(p => ({...p, max_parken: v}))} />

@@ -11,7 +11,7 @@ const navItems = [
   { href: '/eigenaren',    label: 'Eigenaren',    icon: Users },
   { href: '/werklieden',   label: 'Werklieden',   icon: HardHat },
   { href: '/chat',         label: 'Chat',         icon: MessageCircle },
-  { href: '/tessi',        label: 'Tessi',        icon: Bot },
+  // Tessi conditionally added below
   { href: '/instellingen', label: 'Instellingen', icon: Settings },
 ]
 
@@ -23,9 +23,10 @@ const ROLE_LABELS: Record<string, string> = {
 interface Props {
   userName?: string
   userRole?: string
+  tessiActief?: boolean
 }
 
-export function Sidebar({ userName = 'Gebruiker', userRole = 'gebruiker' }: Props) {
+export function Sidebar({ userName = 'Gebruiker', userRole = 'gebruiker', tessiActief = false }: Props) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -46,7 +47,7 @@ export function Sidebar({ userName = 'Gebruiker', userRole = 'gebruiker' }: Prop
         </span>
       </div>
       <p className="px-3 pt-2 pb-1 text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em]">Menu</p>
-      {navItems.map(({ href, label, icon: Icon }) => {
+      {[...navItems, ...(tessiActief ? [{ href: '/tessi', label: 'Tessi', icon: Bot }] : [])].map(({ href, label, icon: Icon }) => {
         const active = pathname.startsWith(href)
         return (
           <Link key={href} href={href}

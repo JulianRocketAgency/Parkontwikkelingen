@@ -589,49 +589,80 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
             <div className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] overflow-hidden">
               <div className="px-5 py-4 border-b border-black/[0.05]">
                 <div className="text-[14px] font-semibold">Add-ons per klant</div>
-                <div className="text-[12px] text-[#6e6e73] mt-0.5">Schakel add-ons in of uit per klant</div>
+                <div className="text-[12px] text-[#6e6e73] mt-0.5">Gebruik en limieten per klant — schakel add-ons in of uit</div>
               </div>
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-black/[0.05] bg-[#f5f5f7]">
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[#6e6e73] uppercase tracking-[0.06em] text-left">Klant</th>
-                    {addons.map(a => (
-                      <th key={a.id} className="px-4 py-3 text-[11px] font-semibold text-[#6e6e73] uppercase tracking-[0.06em] text-center">{a.naam}</th>
-                    ))}
-                    <th className="px-4 py-3 text-[11px] font-semibold text-[#6e6e73] uppercase tracking-[0.06em] text-right">Add-on MRR</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {organisaties.map((org, i) => {
-                    const addonMRR = orgAddons.filter(oa => oa.organisatie_id === org.id && oa.actief).reduce((s, oa) => {
-                      const a = addons.find(a => a.id === oa.addon_id)
-                      return s + (a?.prijs_per_maand ?? 0) * oa.aantal
-                    }, 0)
-                    return (
-                      <tr key={org.id} className={"transition-all " + (i < organisaties.length-1 ? 'border-b border-black/[0.05]' : '')}>
-                        <td className="px-4 py-3">
-                          <div className="text-[13px] font-medium">{org.naam}</div>
-                          <div className="text-[11px] text-[#6e6e73]">{org.licentie_type}</div>
-                        </td>
+              <div className="divide-y divide-black/[0.05]">
+                {organisaties.map(org => {
+                  const orgParks = parks.filter(p => p.organisatie_id === org.id)
+                  const orgUsers = profiles.filter(p => orgParks.some(pk => pk.id === p.park_id))
+                  const orgKavels = 0 // kavels tellen via server side
+                  const pakket = pakketten.find(p => p.slug === org.licentie_type)
+                  const maxUsers = (pakket?.max_gebruikers ?? org.max_gebruikers) + org.extra_gebruikers
+                  const maxParken = (pakket?.max_parken ?? org.max_parken) + org.extra_parken
+                  const addonMRR = orgAddons.filter(oa => oa.organisatie_id === org.id && oa.actief).reduce((s, oa) => {
+                    const a = addons.find(a => a.id === oa.addon_id)
+                    return s + (a?.prijs_per_maand ?? 0) * oa.aantal
+                  }, 0)
+
+                  return (
+                    <div key={org.id} className="px-5 py-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <Avatar name={org.naam} size={30} />
+                        <div className="flex-1">
+                          <div className="text-[13px] font-semibold">{org.naam}</div>
+                          <span className={"text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize " + (PAKKET_COLORS[org.licentie_type] ?? '')}>{org.licentie_type}</span>
+                        </div>
+                        {addonMRR > 0 && <div className="text-[13px] font-semibold text-[#0071e3]">+€{addonMRR}/mnd</div>}
+                      </div>
+
+                      {/* Gebruik overzicht */}
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div className="bg-[#f5f5f7] rounded-[10px] px-3 py-2">
+                          <div className="text-[10px] text-[#6e6e73] mb-1">Gebruikers</div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-[#e8e8ed] rounded-full overflow-hidden">
+                              <div className={"h-full rounded-full " + (orgUsers.length >= maxUsers ? 'bg-[#ff3b30]' : 'bg-[#0071e3]')}
+                                style={{width: Math.min(100, Math.round(orgUsers.length/Math.max(maxUsers,1)*100)) + '%'}} />
+                            </div>
+                            <span className={"text-[11px] font-semibold " + (orgUsers.length >= maxUsers ? 'text-[#ff3b30]' : 'text-[#3a3a3c]')}>
+                              {orgUsers.length}/{maxUsers}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="bg-[#f5f5f7] rounded-[10px] px-3 py-2">
+                          <div className="text-[10px] text-[#6e6e73] mb-1">Parken</div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-[#e8e8ed] rounded-full overflow-hidden">
+                              <div className={"h-full rounded-full " + (orgParks.length >= maxParken ? 'bg-[#ff3b30]' : 'bg-[#30d158]')}
+                                style={{width: Math.min(100, Math.round(orgParks.length/Math.max(maxParken,1)*100)) + '%'}} />
+                            </div>
+                            <span className={"text-[11px] font-semibold " + (orgParks.length >= maxParken ? 'text-[#ff3b30]' : 'text-[#3a3a3c]')}>
+                              {orgParks.length}/{maxParken}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Add-on toggles */}
+                      <div className="flex flex-wrap gap-2">
                         {addons.map(addon => {
                           const orgAddon = orgAddons.find(oa => oa.organisatie_id === org.id && oa.addon_id === addon.id && oa.actief)
+                          const isOn = !!orgAddon
                           return (
-                            <td key={addon.id} className="px-4 py-3 text-center">
-                              <button onClick={() => toggleOrgAddon(org.id, addon.id, orgAddon ? orgAddon.aantal : 1, !orgAddon)}
-                                className={"w-10 h-6 rounded-full transition-all relative " + (orgAddon ? 'bg-[#0071e3]' : 'bg-[#e8e8ed]')}>
-                                <div className={"absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all " + (orgAddon ? 'left-[18px]' : 'left-0.5')} />
-                              </button>
-                            </td>
+                            <button key={addon.id} onClick={() => toggleOrgAddon(org.id, addon.id, 1, !isOn)}
+                              className={"flex items-center gap-2 px-3 py-1.5 rounded-full border text-[12px] font-medium transition-all " +
+                                (isOn ? 'bg-[rgba(0,113,227,0.08)] border-[rgba(0,113,227,0.25)] text-[#004f9e]' : 'bg-[#f5f5f7] border-black/[0.06] text-[#6e6e73] hover:bg-[#e8e8ed]')}>
+                              <div className={"w-3.5 h-3.5 rounded-full flex-shrink-0 " + (isOn ? 'bg-[#0071e3]' : 'bg-[#d1d1d6]')} />
+                              {addon.naam}
+                              {isOn && <span className="text-[10px] text-[#0071e3]">€{addon.prijs_per_maand}/mnd</span>}
+                            </button>
                           )
                         })}
-                        <td className="px-4 py-3 text-right text-[13px] font-medium">
-                          {addonMRR > 0 ? '€' + addonMRR + '/mnd' : <span className="text-[#aeaeb2]">-</span>}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         )}

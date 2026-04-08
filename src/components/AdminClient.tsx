@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Building2, Users, Map, Plus, ChevronRight, X, Check, Package, Settings, LogOut } from 'lucide-react'
+import { Building2, Users, Map, Plus, ChevronRight, X, Check, Package, Settings } from 'lucide-react'
 
 interface LicentiePakket {
   id: string
@@ -85,13 +85,39 @@ function Avatar({ name, color, size = 36 }: { name: string; color?: string; size
   )
 }
 
-export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins, pakketten }: Props) {
+function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">{label}</label>
+      <input value={value} onChange={e => onChange(e.target.value)}
+        className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
+    </div>
+  )
+}
+
+function NumField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">{label}</label>
+      <input type="number" value={value} onChange={e => onChange(parseFloat(e.target.value) || 0)}
+        className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] transition-all" />
+    </div>
+  )
+}
+
+export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins, pakketten: initialPakketten }: Props) {
   const [nav, setNav] = useState<'dashboard' | 'klanten' | 'licenties' | 'gebruikers' | 'instellingen'>('dashboard')
   const [selectedOrg, setSelectedOrg] = useState<Organisatie | null>(null)
   const [organisaties, setOrganisaties] = useState(initialOrgs)
+  const [pakketten, setPakketten] = useState(initialPakketten)
   const [showNieuw, setShowNieuw] = useState(false)
+  const [editOrg, setEditOrg] = useState<Organisatie | null>(null)
+  const [editOrgForm, setEditOrgForm] = useState<Partial<Organisatie>>({})
+  const [editPakket, setEditPakket] = useState<LicentiePakket | null>(null)
+  const [editPakketForm, setEditPakketForm] = useState<Partial<LicentiePakket>>({})
   const [form, setForm] = useState({ naam: '', email: '', telefoon: '', licentie_type: 'starter', max_parken: 1, max_gebruikers: 5, park_naam: '' })
   const [saving, setSaving] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
   const [error, setError] = useState('')
 
   async function handleCreate() {
@@ -108,16 +134,67 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
       setShowNieuw(false)
       setForm({ naam: '', email: '', telefoon: '', licentie_type: 'starter', max_parken: 1, max_gebruikers: 5, park_naam: '' })
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Fout opgetreden')
+      setError(e instanceof Error ? e.message : 'Fout')
     } finally { setSaving(false) }
   }
 
-  const totalMRR = organisaties
-    .filter(o => o.status === 'actief')
-    .reduce((sum, o) => {
-      const pakket = pakketten.find(p => p.slug === o.licentie_type)
-      return sum + (pakket?.prijs_per_maand ?? 0)
-    }, 0)
+  async function handleSaveOrg() {
+    if (!editOrg) return
+    setSavingEdit(true)
+    try {
+      const res = await fetch('/api/admin/update-klant', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editOrg.id, ...editOrgForm }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setOrganisaties(prev => prev.map(o => o.id === editOrg.id ? { ...o, ...data.org } : o))
+      if (selectedOrg?.id === editOrg.id) setSelectedOrg({ ...selectedOrg, ...data.org })
+      setEditOrg(null)
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Fout')
+    } finally { setSavingEdit(false) }
+  }
+
+  async function handleSavePakket() {
+    if (!editPakket) return
+    setSavingEdit(true)
+    try {
+      const res = await fetch('/api/admin/update-pakket', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editPakket.id, ...editPakketForm }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setPakketten(prev => prev.map(p => p.id === editPakket.id ? { ...p, ...data.pakket } : p))
+      setEditPakket(null)
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Fout')
+    } finally { setSavingEdit(false) }
+  }
+
+  function openEditOrg(org: Organisatie) {
+    setEditOrg(org)
+    setEditOrgForm({ naam: org.naam, email: org.email ?? '', telefoon: org.telefoon ?? '', adres: org.adres ?? '', status: org.status, licentie_type: org.licentie_type, licentie_tot: org.licentie_tot ?? '', max_parken: org.max_parken, max_gebruikers: org.max_gebruikers, extra_parken: org.extra_parken, extra_gebruikers: org.extra_gebruikers, notities: org.notities ?? '' })
+  }
+
+  function openEditPakket(p: LicentiePakket) {
+    setEditPakket(p)
+    setEditPakketForm({ naam: p.naam, prijs_per_maand: p.prijs_per_maand, max_parken: p.max_parken, max_gebruikers: p.max_gebruikers, max_kavels: p.max_kavels ?? 0, features: [...p.features] })
+  }
+
+  const totalMRR = organisaties.filter(o => o.status === 'actief').reduce((sum, o) => {
+    const p = pakketten.find(p => p.slug === o.licentie_type)
+    return sum + (p?.prijs_per_maand ?? 0)
+  }, 0)
+
+  const navItems = [
+    { key: 'dashboard', label: 'Dashboard', icon: Building2 },
+    { key: 'klanten', label: 'Klanten', icon: Users },
+    { key: 'licenties', label: 'Licenties', icon: Package },
+    { key: 'gebruikers', label: 'Gebruikers', icon: Users },
+    { key: 'instellingen', label: 'Instellingen', icon: Settings },
+  ]
 
   return (
     <div className="flex min-h-screen">
@@ -130,28 +207,18 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
           </div>
           <div className="text-[11px] text-white/40 mt-0.5">Platform beheer</div>
         </div>
-
         <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5">
-          {[
-            { key: 'dashboard', label: 'Dashboard', icon: Building2 },
-            { key: 'klanten', label: 'Klanten', icon: Users },
-            { key: 'licenties', label: 'Licenties', icon: Package },
-            { key: 'gebruikers', label: 'Gebruikers', icon: Users },
-            { key: 'instellingen', label: 'Instellingen', icon: Settings },
-          ].map(({ key, label, icon: Icon }) => (
+          {navItems.map(({ key, label, icon: Icon }) => (
             <button key={key} onClick={() => setNav(key as typeof nav)}
-              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-[13px] font-medium transition-all text-left w-full
-                ${nav === key ? 'bg-[rgba(0,113,227,0.25)] text-[#60a8f0]' : 'text-white/60 hover:bg-white/[0.07] hover:text-white'}`}>
+              className={"flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-[13px] font-medium transition-all text-left w-full " + (nav === key ? 'bg-[rgba(0,113,227,0.25)] text-[#60a8f0]' : 'text-white/60 hover:bg-white/[0.07] hover:text-white')}>
               <Icon size={15} className="flex-shrink-0" />
               {label}
             </button>
           ))}
         </nav>
-
         <div className="px-3 py-4 border-t border-white/[0.08]">
-
           {admins[0] && (
-            <div className="flex items-center gap-2.5 px-3 py-2 mt-1">
+            <div className="flex items-center gap-2.5 px-3 py-2">
               <Avatar name={admins[0].naam ?? admins[0].email} color="#0071e3" size={28} />
               <div>
                 <div className="text-[12px] font-medium text-white">{admins[0].naam ?? admins[0].email}</div>
@@ -164,6 +231,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
 
       {/* Main */}
       <div className="flex-1 min-w-0 overflow-auto">
+
         {/* Dashboard */}
         {nav === 'dashboard' && (
           <div className="p-8">
@@ -173,10 +241,10 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
             </div>
             <div className="grid grid-cols-4 gap-3 mb-8">
               {[
-                { label: 'Klanten', value: organisaties.length, sub: organisaties.filter(o=>o.status==='actief').length + ' actief' },
-                { label: 'Parken', value: parks.length, sub: 'totaal' },
-                { label: 'Gebruikers', value: profiles.length, sub: 'accounts' },
-                { label: 'MRR', value: '€' + totalMRR, sub: 'per maand' },
+                { label: 'Klanten', value: String(organisaties.length), sub: organisaties.filter(o=>o.status==='actief').length + ' actief' },
+                { label: 'Parken', value: String(parks.length), sub: 'totaal' },
+                { label: 'Gebruikers', value: String(profiles.length), sub: 'accounts' },
+                { label: 'MRR', value: 'EUR' + totalMRR, sub: 'per maand' },
               ].map(({ label, value, sub }) => (
                 <div key={label} className="bg-white rounded-[16px] px-5 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05]">
                   <div className="text-[12px] text-[#6e6e73] font-medium mb-1">{label}</div>
@@ -189,17 +257,17 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
               <div className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] overflow-hidden">
                 <div className="px-5 py-4 border-b border-black/[0.05] flex items-center justify-between">
                   <div className="text-[14px] font-semibold">Recente klanten</div>
-                  <button onClick={() => setNav('klanten')} className="text-[12px] text-[#0071e3] hover:underline">Alle klanten</button>
+                  <button onClick={() => setNav('klanten')} className="text-[12px] text-[#0071e3]">Alle klanten</button>
                 </div>
                 {organisaties.slice(0,5).map((org, i) => (
                   <div key={org.id} onClick={() => { setSelectedOrg(org); setNav('klanten') }}
-                    className={`flex items-center gap-3 px-5 py-3 hover:bg-black/[0.02] cursor-pointer transition-all ${i < 4 ? 'border-b border-black/[0.05]' : ''}`}>
+                    className={"flex items-center gap-3 px-5 py-3 hover:bg-black/[0.02] cursor-pointer transition-all " + (i < 4 ? 'border-b border-black/[0.05]' : '')}>
                     <Avatar name={org.naam} size={32} />
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-medium truncate">{org.naam}</div>
                       <div className="text-[11px] text-[#6e6e73]">{org.email ?? '-'}</div>
                     </div>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${PAKKET_COLORS[org.licentie_type] ?? ''}`}>{org.licentie_type}</span>
+                    <span className={"text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize " + (PAKKET_COLORS[org.licentie_type] ?? '')}>{org.licentie_type}</span>
                   </div>
                 ))}
               </div>
@@ -215,10 +283,10 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                       <div key={p.id}>
                         <div className="flex justify-between text-[13px] mb-1">
                           <span className="font-medium">{p.naam}</span>
-                          <span className="text-[#6e6e73]">{count} klanten · €{p.prijs_per_maand}/mnd</span>
+                          <span className="text-[#6e6e73]">{count} klanten · EUR{p.prijs_per_maand}/mnd</span>
                         </div>
                         <div className="h-1.5 bg-[#f5f5f7] rounded-full overflow-hidden">
-                          <div className="h-full bg-[#0071e3] rounded-full transition-all" style={{width: pct + '%'}} />
+                          <div className="h-full bg-[#0071e3] rounded-full" style={{width: pct + '%'}} />
                         </div>
                       </div>
                     )
@@ -236,7 +304,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h1 className="text-[26px] font-bold tracking-[-0.5px]">Klanten</h1>
-                  <p className="text-[14px] text-[#6e6e73] mt-0.5">{organisaties.length} klanten totaal</p>
+                  <p className="text-[14px] text-[#6e6e73] mt-0.5">{organisaties.length} klanten</p>
                 </div>
                 <button onClick={() => setShowNieuw(true)}
                   className="px-4 py-2 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] transition-all flex items-center gap-1.5">
@@ -256,9 +324,10 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                     {organisaties.map((org, i) => {
                       const orgParks = parks.filter(p => p.organisatie_id === org.id)
                       const orgUsers = profiles.filter(p => orgParks.some(pk => pk.id === p.park_id))
+                      const isSelected = selectedOrg?.id === org.id
                       return (
-                        <tr key={org.id} onClick={() => setSelectedOrg(org === selectedOrg ? null : org)}
-                          className={`cursor-pointer transition-all ${org === selectedOrg ? '[&>td]:bg-[rgba(0,113,227,0.05)]' : 'hover:[&>td]:bg-black/[0.02]'} ${i < organisaties.length-1 ? '[&>td]:border-b [&>td]:border-black/[0.05]' : ''}`}>
+                        <tr key={org.id} onClick={() => setSelectedOrg(isSelected ? null : org)}
+                          className={"cursor-pointer transition-all " + (isSelected ? '[&>td]:bg-[rgba(0,113,227,0.05)]' : 'hover:[&>td]:bg-black/[0.02]') + (i < organisaties.length-1 ? ' [&>td]:border-b [&>td]:border-black/[0.05]' : '')}>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2.5">
                               <Avatar name={org.naam} size={30} />
@@ -271,10 +340,10 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                           <td className="px-4 py-3 text-[13px]">{orgParks.length}/{org.max_parken + org.extra_parken}</td>
                           <td className="px-4 py-3 text-[13px]">{orgUsers.length}/{org.max_gebruikers + org.extra_gebruikers}</td>
                           <td className="px-4 py-3">
-                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${PAKKET_COLORS[org.licentie_type] ?? ''}`}>{org.licentie_type}</span>
+                            <span className={"text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize " + (PAKKET_COLORS[org.licentie_type] ?? '')}>{org.licentie_type}</span>
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${STATUS_COLORS[org.status] ?? ''}`}>{org.status}</span>
+                            <span className={"text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize " + (STATUS_COLORS[org.status] ?? '')}>{org.status}</span>
                           </td>
                           <td className="px-4 py-3 text-[12px] text-[#6e6e73]">{new Date(org.created_at).toLocaleDateString('nl-NL')}</td>
                           <td className="px-4 py-3 text-[#aeaeb2]"><ChevronRight size={14} /></td>
@@ -286,58 +355,41 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
               </div>
             </div>
 
-            {/* Detail panel */}
             {selectedOrg && (
-              <div className="w-[340px] flex-shrink-0 bg-white border-l border-black/[0.08] h-screen sticky top-0 overflow-y-auto">
+              <div className="w-[320px] flex-shrink-0 bg-white border-l border-black/[0.08] h-screen sticky top-0 overflow-y-auto">
                 <div className="px-5 py-4 border-b border-black/[0.05] flex items-center justify-between">
-                  <div className="text-[14px] font-semibold">{selectedOrg.naam}</div>
-                  <button onClick={() => setSelectedOrg(null)} className="w-6 h-6 rounded-full bg-black/[0.06] flex items-center justify-center hover:bg-black/10 transition-all">
+                  <div className="text-[14px] font-semibold truncate">{selectedOrg.naam}</div>
+                  <button onClick={() => setSelectedOrg(null)} className="w-6 h-6 rounded-full bg-black/[0.06] flex items-center justify-center hover:bg-black/10 flex-shrink-0">
                     <X size={11} />
                   </button>
                 </div>
                 <div className="p-5">
-                  <div className="flex items-center gap-3 mb-5">
-                    <Avatar name={selectedOrg.naam} size={44} />
+                  <div className="flex items-center gap-3 mb-4">
+                    <Avatar name={selectedOrg.naam} size={40} />
                     <div>
-                      <div className="text-[15px] font-bold">{selectedOrg.naam}</div>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${STATUS_COLORS[selectedOrg.status]}`}>{selectedOrg.status}</span>
+                      <div className="text-[14px] font-bold">{selectedOrg.naam}</div>
+                      <span className={"text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize " + STATUS_COLORS[selectedOrg.status]}>{selectedOrg.status}</span>
                     </div>
                   </div>
-
-                  <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-2">Contactgegevens</div>
-                  {[['Email', selectedOrg.email ?? '—'], ['Telefoon', selectedOrg.telefoon ?? '—'], ['Adres', selectedOrg.adres ?? '—']].map(([l,v]) => (
-                    <div key={l} className="flex justify-between py-2 border-b border-black/[0.05] text-[13px]">
-                      <span className="text-[#6e6e73]">{l}</span><span className="font-medium">{v}</span>
-                    </div>
-                  ))}
-
-                  <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-2 mt-4">Licentie</div>
-                  {[
-                    ['Pakket', selectedOrg.licentie_type],
-                    ['Geldig tot', selectedOrg.licentie_tot ? new Date(selectedOrg.licentie_tot).toLocaleDateString('nl-NL') : 'Onbeperkt'],
-                    ['Max parken', String(selectedOrg.max_parken + selectedOrg.extra_parken)],
-                    ['Max gebruikers', String(selectedOrg.max_gebruikers + selectedOrg.extra_gebruikers)],
-                    ['Extra parken', String(selectedOrg.extra_parken)],
-                    ['Extra gebruikers', String(selectedOrg.extra_gebruikers)],
-                  ].map(([l,v]) => (
+                  {[['Email', selectedOrg.email ?? '-'], ['Telefoon', selectedOrg.telefoon ?? '-'], ['Pakket', selectedOrg.licentie_type], ['Geldig tot', selectedOrg.licentie_tot ? new Date(selectedOrg.licentie_tot).toLocaleDateString('nl-NL') : 'Onbeperkt'], ['Max parken', String(selectedOrg.max_parken + selectedOrg.extra_parken)], ['Max gebruikers', String(selectedOrg.max_gebruikers + selectedOrg.extra_gebruikers)]].map(([l,v]) => (
                     <div key={l} className="flex justify-between py-2 border-b border-black/[0.05] text-[13px]">
                       <span className="text-[#6e6e73]">{l}</span><span className="font-medium capitalize">{v}</span>
                     </div>
                   ))}
-
                   <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-2 mt-4">Parken</div>
                   {parks.filter(p => p.organisatie_id === selectedOrg.id).map(p => (
                     <div key={p.id} className="flex items-center gap-2 px-3 py-2 bg-[#f5f5f7] rounded-[10px] mb-1.5">
                       <Map size={12} className="text-[#6e6e73]" />
                       <span className="text-[12px] font-medium flex-1">{p.name}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${STATUS_COLORS[p.status ?? 'actief']}`}>{p.status ?? 'actief'}</span>
                     </div>
                   ))}
-
-                  <div className="flex gap-2 mt-5">
-                    <button className="flex-1 py-2 rounded-full bg-black/[0.06] text-[#3a3a3c] text-[12px] font-medium hover:bg-black/10 transition-all">Bewerken</button>
-                    <button className="flex-1 py-2 rounded-full bg-[#0071e3] text-white text-[12px] font-medium hover:bg-[#0077ed] transition-all">Inloggen als</button>
-                  </div>
+                  {selectedOrg.notities && (
+                    <div className="mt-4 p-3 bg-[rgba(255,159,10,0.08)] rounded-[10px] text-[12px] text-[#a05a00]">{selectedOrg.notities}</div>
+                  )}
+                  <button onClick={() => openEditOrg(selectedOrg)}
+                    className="w-full mt-4 py-2.5 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] transition-all">
+                    Bewerken
+                  </button>
                 </div>
               </div>
             )}
@@ -349,7 +401,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
           <div className="p-8">
             <div className="mb-6">
               <h1 className="text-[26px] font-bold tracking-[-0.5px]">Licentie pakketten</h1>
-              <p className="text-[14px] text-[#6e6e73] mt-0.5">Beheer de beschikbare pakketten</p>
+              <p className="text-[14px] text-[#6e6e73] mt-0.5">Beheer prijzen en limieten</p>
             </div>
             <div className="grid grid-cols-3 gap-4 mb-8">
               {pakketten.map(p => {
@@ -357,12 +409,12 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                 return (
                   <div key={p.id} className="bg-white rounded-[20px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] p-6">
                     <div className="flex items-center justify-between mb-3">
-                      <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full capitalize ${PAKKET_COLORS[p.slug]}`}>{p.naam}</span>
+                      <span className={"text-[11px] font-semibold px-2.5 py-1 rounded-full capitalize " + (PAKKET_COLORS[p.slug] ?? '')}>{p.naam}</span>
                       <span className="text-[12px] text-[#6e6e73]">{count} klanten</span>
                     </div>
-                    <div className="text-[32px] font-bold tracking-[-1px] mb-0.5">€{p.prijs_per_maand}</div>
+                    <div className="text-[32px] font-bold tracking-[-1px] mb-0.5">EUR{p.prijs_per_maand}</div>
                     <div className="text-[12px] text-[#6e6e73] mb-4">per maand</div>
-                    <div className="flex flex-col gap-2 mb-5">
+                    <div className="flex flex-col gap-2 mb-4">
                       {p.features.map(f => (
                         <div key={f} className="flex items-center gap-2 text-[12px]">
                           <Check size={12} className="text-[#30d158] flex-shrink-0" />
@@ -370,40 +422,23 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                         </div>
                       ))}
                     </div>
-                    <div className="grid grid-cols-2 gap-2 pt-4 border-t border-black/[0.05]">
+                    <div className="grid grid-cols-2 gap-2 py-3 border-t border-black/[0.05]">
                       <div className="text-center">
                         <div className="text-[10px] text-[#6e6e73]">Max parken</div>
-                        <div className="text-[14px] font-bold">{p.max_parken >= 99 ? '∞' : p.max_parken}</div>
+                        <div className="text-[14px] font-bold">{p.max_parken >= 99 ? 'onbep.' : p.max_parken}</div>
                       </div>
                       <div className="text-center">
                         <div className="text-[10px] text-[#6e6e73]">Max gebruikers</div>
-                        <div className="text-[14px] font-bold">{p.max_gebruikers >= 99 ? '∞' : p.max_gebruikers}</div>
+                        <div className="text-[14px] font-bold">{p.max_gebruikers >= 99 ? 'onbep.' : p.max_gebruikers}</div>
                       </div>
                     </div>
+                    <button onClick={() => openEditPakket(p)}
+                      className="w-full mt-3 py-2 rounded-full bg-black/[0.06] text-[13px] font-medium hover:bg-black/10 transition-all">
+                      Bewerken
+                    </button>
                   </div>
                 )
               })}
-            </div>
-            <div className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] overflow-hidden">
-              <div className="px-5 py-4 border-b border-black/[0.05]">
-                <div className="text-[14px] font-semibold">Add-ons (extra licenties)</div>
-                <div className="text-[12px] text-[#6e6e73] mt-0.5">Bovenop het basispakket bij te kopen</div>
-              </div>
-              <div className="divide-y divide-black/[0.05]">
-                {[
-                  { naam: 'Extra park', prijs: 29, beschrijving: 'Voeg een extra park toe aan het account' },
-                  { naam: 'Extra gebruiker', prijs: 9, beschrijving: 'Voeg 5 extra gebruikers toe' },
-                  { naam: 'Tessi AI', prijs: 19, beschrijving: 'AI assistent voor het park' },
-                ].map(addon => (
-                  <div key={addon.naam} className="flex items-center gap-4 px-5 py-4">
-                    <div className="flex-1">
-                      <div className="text-[13px] font-medium">{addon.naam}</div>
-                      <div className="text-[11px] text-[#6e6e73]">{addon.beschrijving}</div>
-                    </div>
-                    <div className="text-[14px] font-bold">€{addon.prijs}<span className="text-[11px] font-normal text-[#6e6e73]">/mnd</span></div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         )}
@@ -413,7 +448,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
           <div className="p-8">
             <div className="mb-6">
               <h1 className="text-[26px] font-bold tracking-[-0.5px]">Gebruikers</h1>
-              <p className="text-[14px] text-[#6e6e73] mt-0.5">{profiles.length} accounts totaal</p>
+              <p className="text-[14px] text-[#6e6e73] mt-0.5">{profiles.length} accounts</p>
             </div>
             <div className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] overflow-hidden">
               <table className="w-full">
@@ -430,22 +465,20 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                     const org = park ? organisaties.find(o => o.id === park.organisatie_id) : null
                     const name = p.naam ?? p.full_name ?? p.email ?? 'Onbekend'
                     return (
-                      <tr key={p.id} className={`hover:bg-black/[0.02] transition-all ${i < profiles.length-1 ? 'border-b border-black/[0.05]' : ''}`}>
+                      <tr key={p.id} className={"hover:bg-black/[0.02] transition-all " + (i < profiles.length-1 ? 'border-b border-black/[0.05]' : '')}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
                             <Avatar name={name} color={p.avatar_color ?? '#0071e3'} size={28} />
                             <span className="text-[13px] font-medium">{name}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-[12px] text-[#6e6e73]">{p.email ?? '—'}</td>
-                        <td className="px-4 py-3">
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-black/[0.06] capitalize">{p.role ?? '—'}</span>
-                        </td>
+                        <td className="px-4 py-3 text-[12px] text-[#6e6e73]">{p.email ?? '-'}</td>
+                        <td className="px-4 py-3"><span className="text-[11px] px-2 py-0.5 rounded-full bg-black/[0.06] capitalize">{p.role ?? '-'}</span></td>
                         <td className="px-4 py-3 text-[12px]">
-                          <div className="text-[#3a3a3c]">{park?.name ?? '—'}</div>
+                          <div>{park?.name ?? '-'}</div>
                           {org && <div className="text-[11px] text-[#6e6e73]">{org.naam}</div>}
                         </td>
-                        <td className="px-4 py-3 text-[12px] text-[#6e6e73]">{p.created_at ? new Date(p.created_at).toLocaleDateString('nl-NL') : '—'}</td>
+                        <td className="px-4 py-3 text-[12px] text-[#6e6e73]">{p.created_at ? new Date(p.created_at).toLocaleDateString('nl-NL') : '-'}</td>
                       </tr>
                     )
                   })}
@@ -460,15 +493,14 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
           <div className="p-8 max-w-[600px]">
             <div className="mb-6">
               <h1 className="text-[26px] font-bold tracking-[-0.5px]">Instellingen</h1>
-              <p className="text-[14px] text-[#6e6e73] mt-0.5">Platform configuratie</p>
             </div>
-            <div className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] p-6 mb-4">
+            <div className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] p-6">
               <div className="text-[14px] font-semibold mb-4">Platform admins</div>
               {admins.map(a => (
                 <div key={a.id} className="flex items-center gap-3 py-2.5 border-b border-black/[0.05] last:border-0">
                   <Avatar name={a.naam ?? a.email} color="#0071e3" size={32} />
                   <div className="flex-1">
-                    <div className="text-[13px] font-medium">{a.naam ?? '—'}</div>
+                    <div className="text-[13px] font-medium">{a.naam ?? '-'}</div>
                     <div className="text-[11px] text-[#6e6e73]">{a.email}</div>
                   </div>
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(191,90,242,0.12)] text-[#7a1fa5]">Admin</span>
@@ -488,34 +520,18 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
             <div className="text-[13px] text-[#6e6e73] mb-5">Er wordt automatisch een eerste park aangemaakt.</div>
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Bedrijfsnaam *</label>
-                  <input value={form.naam} onChange={e => setForm(p => ({...p, naam: e.target.value}))} placeholder="bijv. Heideplas BV"
-                    className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Email *</label>
-                  <input type="email" value={form.email} onChange={e => setForm(p => ({...p, email: e.target.value}))} placeholder="info@klant.nl"
-                    className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
-                </div>
+                <Field label="Bedrijfsnaam *" value={form.naam} onChange={v => setForm(p => ({...p, naam: v}))} />
+                <Field label="Email *" value={form.email} onChange={v => setForm(p => ({...p, email: v}))} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Telefoon</label>
-                  <input value={form.telefoon} onChange={e => setForm(p => ({...p, telefoon: e.target.value}))} placeholder="06-12345678"
-                    className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Naam eerste park</label>
-                  <input value={form.park_naam} onChange={e => setForm(p => ({...p, park_naam: e.target.value}))} placeholder="Zelfde als bedrijfsnaam"
-                    className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
-                </div>
+                <Field label="Telefoon" value={form.telefoon} onChange={v => setForm(p => ({...p, telefoon: v}))} />
+                <Field label="Naam eerste park" value={form.park_naam} onChange={v => setForm(p => ({...p, park_naam: v}))} />
               </div>
               <div>
                 <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Licentie pakket</label>
                 <select value={form.licentie_type} onChange={e => setForm(p => ({...p, licentie_type: e.target.value}))}
                   className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] transition-all">
-                  {pakketten.map(p => <option key={p.id} value={p.slug}>{p.naam} — €{p.prijs_per_maand}/mnd</option>)}
+                  {pakketten.map(p => <option key={p.id} value={p.slug}>{p.naam} — EUR{p.prijs_per_maand}/mnd</option>)}
                 </select>
               </div>
               {error && <div className="text-[12px] text-[#ff3b30] bg-[rgba(255,59,48,0.08)] rounded-[8px] px-3 py-2">{error}</div>}
@@ -524,6 +540,96 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
               <button onClick={() => { setShowNieuw(false); setError('') }} className="flex-1 py-2.5 rounded-full bg-black/[0.06] text-[13px] font-medium hover:bg-black/10">Annuleren</button>
               <button onClick={handleCreate} disabled={saving} className="flex-1 py-2.5 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] disabled:opacity-50">
                 {saving ? 'Aanmaken...' : 'Klant aanmaken'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Edit klant modal */}
+      {editOrg && (
+        <>
+          <div className="fixed inset-0 bg-black/[0.4] backdrop-blur-[4px] z-[200]" onClick={() => setEditOrg(null)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] bg-white rounded-[20px] shadow-[0_12px_40px_rgba(0,0,0,0.2)] w-[520px] p-6 max-h-[90vh] overflow-y-auto">
+            <div className="text-[18px] font-bold mb-1">Klant bewerken</div>
+            <div className="text-[13px] text-[#6e6e73] mb-5">{editOrg.naam}</div>
+            <div className="flex flex-col gap-3">
+              <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em]">Contactgegevens</div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Bedrijfsnaam" value={String(editOrgForm.naam ?? '')} onChange={v => setEditOrgForm(p => ({...p, naam: v}))} />
+                <Field label="Email" value={String(editOrgForm.email ?? '')} onChange={v => setEditOrgForm(p => ({...p, email: v}))} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Telefoon" value={String(editOrgForm.telefoon ?? '')} onChange={v => setEditOrgForm(p => ({...p, telefoon: v}))} />
+                <Field label="Adres" value={String(editOrgForm.adres ?? '')} onChange={v => setEditOrgForm(p => ({...p, adres: v}))} />
+              </div>
+              <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mt-1">Licentie</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Pakket</label>
+                  <select value={String(editOrgForm.licentie_type ?? '')} onChange={e => setEditOrgForm(p => ({...p, licentie_type: e.target.value}))}
+                    className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] transition-all">
+                    {pakketten.map(p => <option key={p.id} value={p.slug}>{p.naam}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Status</label>
+                  <select value={String(editOrgForm.status ?? '')} onChange={e => setEditOrgForm(p => ({...p, status: e.target.value}))}
+                    className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] transition-all">
+                    <option value="actief">Actief</option>
+                    <option value="inactief">Inactief</option>
+                    <option value="proef">Proef</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Geldig tot" value={String(editOrgForm.licentie_tot ?? '')} onChange={v => setEditOrgForm(p => ({...p, licentie_tot: v}))} />
+                <NumField label="Extra parken" value={Number(editOrgForm.extra_parken ?? 0)} onChange={v => setEditOrgForm(p => ({...p, extra_parken: v}))} />
+                <NumField label="Extra gebruikers" value={Number(editOrgForm.extra_gebruikers ?? 0)} onChange={v => setEditOrgForm(p => ({...p, extra_gebruikers: v}))} />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Notities</label>
+                <textarea value={String(editOrgForm.notities ?? '')} onChange={e => setEditOrgForm(p => ({...p, notities: e.target.value}))} rows={3}
+                  className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all resize-none" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setEditOrg(null)} className="flex-1 py-2.5 rounded-full bg-black/[0.06] text-[13px] font-medium hover:bg-black/10">Annuleren</button>
+              <button onClick={handleSaveOrg} disabled={savingEdit} className="flex-1 py-2.5 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] disabled:opacity-50">
+                {savingEdit ? 'Opslaan...' : 'Opslaan'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Edit pakket modal */}
+      {editPakket && (
+        <>
+          <div className="fixed inset-0 bg-black/[0.4] backdrop-blur-[4px] z-[200]" onClick={() => setEditPakket(null)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] bg-white rounded-[20px] shadow-[0_12px_40px_rgba(0,0,0,0.2)] w-[480px] p-6">
+            <div className="text-[18px] font-bold mb-1">Pakket bewerken</div>
+            <div className="text-[13px] text-[#6e6e73] mb-5">{editPakket.naam}</div>
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Naam" value={String(editPakketForm.naam ?? '')} onChange={v => setEditPakketForm(p => ({...p, naam: v}))} />
+                <NumField label="Prijs per maand (EUR)" value={Number(editPakketForm.prijs_per_maand ?? 0)} onChange={v => setEditPakketForm(p => ({...p, prijs_per_maand: v}))} />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <NumField label="Max parken" value={Number(editPakketForm.max_parken ?? 0)} onChange={v => setEditPakketForm(p => ({...p, max_parken: v}))} />
+                <NumField label="Max gebruikers" value={Number(editPakketForm.max_gebruikers ?? 0)} onChange={v => setEditPakketForm(p => ({...p, max_gebruikers: v}))} />
+                <NumField label="Max kavels" value={Number(editPakketForm.max_kavels ?? 0)} onChange={v => setEditPakketForm(p => ({...p, max_kavels: v}))} />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Features (één per regel)</label>
+                <textarea value={(editPakketForm.features ?? []).join(String.fromCharCode(10))} onChange={e => setEditPakketForm(p => ({...p, features: e.target.value.split(String.fromCharCode(10)).filter(f => f.trim())}))}
+                  rows={5} className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] outline-none focus:border-[#0071e3] focus:bg-white transition-all resize-none font-mono" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setEditPakket(null)} className="flex-1 py-2.5 rounded-full bg-black/[0.06] text-[13px] font-medium hover:bg-black/10">Annuleren</button>
+              <button onClick={handleSavePakket} disabled={savingEdit} className="flex-1 py-2.5 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] disabled:opacity-50">
+                {savingEdit ? 'Opslaan...' : 'Opslaan'}
               </button>
             </div>
           </div>

@@ -149,11 +149,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
         </nav>
 
         <div className="px-3 py-4 border-t border-white/[0.08]">
-          <a href="/dashboard"
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-[13px] text-white/50 hover:bg-white/[0.07] hover:text-white transition-all">
-            <LogOut size={14} />
-            Naar park
-          </a>
+
           {admins[0] && (
             <div className="flex items-center gap-2.5 px-3 py-2 mt-1">
               <Avatar name={admins[0].naam ?? admins[0].email} color="#0071e3" size={28} />

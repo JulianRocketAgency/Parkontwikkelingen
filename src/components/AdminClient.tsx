@@ -22,6 +22,7 @@ interface Addon {
   prijs_per_maand: number
   eenheid: string
   actief: boolean
+  heeft_aantal: boolean
 }
 
 interface OrgAddon {
@@ -649,22 +650,50 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                         </div>
                       </div>
 
-                      {/* Add-on toggles */}
-                      <div className="flex flex-wrap gap-2">
+                      {/* Add-on controls */}
+                      <div className="grid grid-cols-2 gap-2 mt-1">
                         {addons.map(addon => {
-                          const orgAddon = orgAddons.find(oa => oa.organisatie_id === org.id && oa.addon_id === addon.id && oa.actief)
-                          const isOn = !!orgAddon
+                          const orgAddon = orgAddons.find(oa => oa.organisatie_id === org.id && oa.addon_id === addon.id)
+                          const aantal = orgAddon?.aantal ?? 0
+                          const isOn = aantal > 0
+                          const maandprijs = addon.prijs_per_maand * (addon.heeft_aantal ? aantal : 1)
+
+                          if (!addon.heeft_aantal) {
+                            return (
+                              <button key={addon.id} onClick={() => toggleOrgAddon(org.id, addon.id, isOn ? 0 : 1, !isOn)}
+                                className={"flex items-center gap-2 px-3 py-2 rounded-[10px] border text-[12px] font-medium transition-all " + (isOn ? 'bg-[rgba(0,113,227,0.05)] border-[rgba(0,113,227,0.2)] text-[#004f9e]' : 'bg-[#f5f5f7] border-black/[0.05] text-[#6e6e73] hover:bg-[#e8e8ed]')}>
+                                <div className={"w-3 h-3 rounded-full " + (isOn ? 'bg-[#0071e3]' : 'bg-[#d1d1d6]')} />
+                                <span className="flex-1 text-left">{addon.naam}</span>
+                                {isOn && <span className="text-[10px] text-[#0071e3]">€{addon.prijs_per_maand}/mnd</span>}
+                              </button>
+                            )
+                          }
+
                           return (
-                            <button key={addon.id} onClick={() => toggleOrgAddon(org.id, addon.id, 1, !isOn)}
-                              className={"flex items-center gap-2 px-3 py-1.5 rounded-full border text-[12px] font-medium transition-all " +
-                                (isOn ? 'bg-[rgba(0,113,227,0.08)] border-[rgba(0,113,227,0.25)] text-[#004f9e]' : 'bg-[#f5f5f7] border-black/[0.06] text-[#6e6e73] hover:bg-[#e8e8ed]')}>
-                              <div className={"w-3.5 h-3.5 rounded-full flex-shrink-0 " + (isOn ? 'bg-[#0071e3]' : 'bg-[#d1d1d6]')} />
-                              {addon.naam}
-                              {isOn && <span className="text-[10px] font-medium text-[#0071e3]">Toegang</span>}
-                            </button>
+                            <div key={addon.id} className={"flex items-center gap-2 px-3 py-2 rounded-[10px] border transition-all " + (isOn ? 'bg-[rgba(0,113,227,0.05)] border-[rgba(0,113,227,0.2)]' : 'bg-[#f5f5f7] border-black/[0.05]')}>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[12px] font-medium text-[#3a3a3c]">{addon.naam}</div>
+                                {isOn && <div className="text-[10px] text-[#0071e3]">{aantal}x €{addon.prijs_per_maand} = €{maandprijs}/mnd</div>}
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button onClick={() => toggleOrgAddon(org.id, addon.id, Math.max(0, aantal - 1), aantal > 1)}
+                                  disabled={aantal === 0}
+                                  className="w-6 h-6 rounded-full bg-white border border-black/[0.1] text-[14px] font-bold flex items-center justify-center hover:bg-[#f5f5f7] disabled:opacity-30 transition-all">-</button>
+                                <span className={"text-[13px] font-semibold w-5 text-center " + (isOn ? 'text-[#0071e3]' : 'text-[#aeaeb2]')}>{aantal}</span>
+                                <button onClick={() => toggleOrgAddon(org.id, addon.id, aantal + 1, true)}
+                                  className="w-6 h-6 rounded-full bg-[#0071e3] text-white text-[14px] font-bold flex items-center justify-center hover:bg-[#0077ed] transition-all">+</button>
+                              </div>
+                            </div>
                           )
                         })}
                       </div>
+                      {(() => {
+                        const addonMRR = orgAddons.filter(oa => oa.organisatie_id === org.id && oa.aantal > 0).reduce((s, oa) => {
+                          const a = addons.find(a => a.id === oa.addon_id)
+                          return s + (a?.prijs_per_maand ?? 0) * oa.aantal
+                        }, 0)
+                        return addonMRR > 0 ? <div className="mt-2 text-right text-[12px] font-semibold text-[#0071e3]">Add-ons: €{addonMRR}/mnd</div> : null
+                      })()}
                     </div>
                   )
                 })}

@@ -32,6 +32,7 @@ export async function POST(req: Request) {
         role,
         avatar_color: '#0071e3',
         vakman_categorie_id: vakman_categorie_id || null,
+        park_id: '11111111-0000-0000-0000-000000000001',
       })
       .select()
       .single()

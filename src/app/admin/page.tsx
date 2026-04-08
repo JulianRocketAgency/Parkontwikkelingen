@@ -8,12 +8,14 @@ export default async function AdminPage() {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  const [orgsRes, parksRes, profilesRes, adminsRes, pakkettenRes] = await Promise.all([
+  const [orgsRes, parksRes, profilesRes, adminsRes, pakkettenRes, addonsRes, orgAddonsRes] = await Promise.all([
     supabase.from('organisaties').select('*').order('created_at', { ascending: false }),
     supabase.from('parks').select('*').order('created_at', { ascending: false }),
     supabase.from('profiles').select('*').order('created_at', { ascending: false }),
     supabase.from('platform_admins').select('*'),
     supabase.from('licentie_pakketten').select('*').eq('actief', true).order('prijs_per_maand'),
+    supabase.from('addons').select('*').eq('actief', true).order('prijs_per_maand'),
+    supabase.from('organisatie_addons').select('*'),
   ])
 
   return (
@@ -23,6 +25,8 @@ export default async function AdminPage() {
       profiles={profilesRes.data ?? []}
       admins={adminsRes.data ?? []}
       pakketten={pakkettenRes.data ?? []}
+      addons={addonsRes.data ?? []}
+      orgAddons={orgAddonsRes.data ?? []}
     />
   )
 }

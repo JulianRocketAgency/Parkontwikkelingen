@@ -14,6 +14,25 @@ interface LicentiePakket {
   actief: boolean
 }
 
+interface Addon {
+  id: string
+  slug: string
+  naam: string
+  beschrijving: string | null
+  prijs_per_maand: number
+  eenheid: string
+  actief: boolean
+}
+
+interface OrgAddon {
+  id: string
+  organisatie_id: string
+  addon_id: string
+  aantal: number
+  actief: boolean
+  gestart_op: string
+}
+
 interface Organisatie {
   id: string
   naam: string
@@ -58,6 +77,8 @@ interface Props {
   profiles: Profile[]
   admins: { id: string; email: string; naam: string | null }[]
   pakketten: LicentiePakket[]
+  addons: Addon[]
+  orgAddons: OrgAddon[]
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -105,11 +126,15 @@ function NumField({ label, value, onChange }: { label: string; value: number; on
   )
 }
 
-export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins, pakketten: initialPakketten }: Props) {
-  const [nav, setNav] = useState<'dashboard' | 'klanten' | 'licenties' | 'gebruikers' | 'instellingen'>('dashboard')
+export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins, pakketten: initialPakketten, addons: initialAddons, orgAddons: initialOrgAddons }: Props) {
+  const [nav, setNav] = useState<'dashboard' | 'klanten' | 'licenties' | 'addons' | 'gebruikers' | 'instellingen'>('dashboard')
   const [selectedOrg, setSelectedOrg] = useState<Organisatie | null>(null)
   const [organisaties, setOrganisaties] = useState(initialOrgs)
   const [pakketten, setPakketten] = useState(initialPakketten)
+  const [addons, setAddons] = useState(initialAddons)
+  const [orgAddons, setOrgAddons] = useState(initialOrgAddons)
+  const [editAddon, setEditAddon] = useState<Addon | null>(null)
+  const [editAddonForm, setEditAddonForm] = useState<Partial<Addon>>({})
   const [showNieuw, setShowNieuw] = useState(false)
   const [editOrg, setEditOrg] = useState<Organisatie | null>(null)
   const [editOrgForm, setEditOrgForm] = useState<Partial<Organisatie>>({})
@@ -173,6 +198,43 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
     } finally { setSavingEdit(false) }
   }
 
+  async function handleSaveAddon() {
+    if (!editAddon) return
+    setSavingEdit(true)
+    try {
+      const res = await fetch('/api/admin/update-addon', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editAddon.id, ...editAddonForm }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setAddons(prev => prev.map(a => a.id === editAddon.id ? { ...a, ...data.addon } : a))
+      setEditAddon(null)
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Fout')
+    } finally { setSavingEdit(false) }
+  }
+
+  async function toggleOrgAddon(orgId: string, addonId: string, aantal: number, actief: boolean) {
+    try {
+      const res = await fetch('/api/admin/toggle-org-addon', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organisatie_id: orgId, addon_id: addonId, aantal, actief }),
+      })
+      if (!res.ok) throw new Error('Fout')
+      if (actief) {
+        setOrgAddons(prev => {
+          const filtered = prev.filter(o => !(o.organisatie_id === orgId && o.addon_id === addonId))
+          return [...filtered, { id: Date.now().toString(), organisatie_id: orgId, addon_id: addonId, aantal, actief: true, gestart_op: new Date().toISOString().split('T')[0] }]
+        })
+      } else {
+        setOrgAddons(prev => prev.filter(o => !(o.organisatie_id === orgId && o.addon_id === addonId)))
+      }
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Fout')
+    }
+  }
+
   function openEditOrg(org: Organisatie) {
     setEditOrg(org)
     setEditOrgForm({ naam: org.naam, email: org.email ?? '', telefoon: org.telefoon ?? '', adres: org.adres ?? '', status: org.status, licentie_type: org.licentie_type, licentie_tot: org.licentie_tot ?? '', max_parken: org.max_parken, max_gebruikers: org.max_gebruikers, extra_parken: org.extra_parken, extra_gebruikers: org.extra_gebruikers, notities: org.notities ?? '' })
@@ -185,7 +247,13 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
 
   const totalMRR = organisaties.filter(o => o.status === 'actief').reduce((sum, o) => {
     const p = pakketten.find(p => p.slug === o.licentie_type)
-    return sum + (p?.prijs_per_maand ?? 0)
+    const addonMRR = orgAddons
+      .filter(oa => oa.organisatie_id === o.id && oa.actief)
+      .reduce((s, oa) => {
+        const a = addons.find(a => a.id === oa.addon_id)
+        return s + (a?.prijs_per_maand ?? 0) * oa.aantal
+      }, 0)
+    return sum + (p?.prijs_per_maand ?? 0) + addonMRR
   }, 0)
 
   const navItems = [
@@ -193,6 +261,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
     { key: 'klanten', label: 'Klanten', icon: Users },
     { key: 'licenties', label: 'Licenties', icon: Package },
     { key: 'gebruikers', label: 'Gebruikers', icon: Users },
+    { key: 'addons', label: 'Add-ons', icon: Package },
     { key: 'instellingen', label: 'Instellingen', icon: Settings },
   ]
 
@@ -488,6 +557,85 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
           </div>
         )}
 
+        {/* Add-ons */}
+        {nav === 'addons' && (
+          <div className="p-8">
+            <div className="mb-6">
+              <h1 className="text-[26px] font-bold tracking-[-0.5px]">Add-ons</h1>
+              <p className="text-[14px] text-[#6e6e73] mt-0.5">Beheer prijzen en toewijzing per klant</p>
+            </div>
+
+            {/* Add-on prijzen */}
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              {addons.map(addon => (
+                <div key={addon.id} className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-[14px] font-semibold">{addon.naam}</div>
+                    <div className="text-[20px] font-bold">€{addon.prijs_per_maand}<span className="text-[11px] font-normal text-[#6e6e73] ml-1">{addon.eenheid}</span></div>
+                  </div>
+                  <div className="text-[12px] text-[#6e6e73] mb-3">{addon.beschrijving}</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-[#aeaeb2]">{orgAddons.filter(o => o.addon_id === addon.id && o.actief).length} klanten actief</span>
+                    <button onClick={() => { setEditAddon(addon); setEditAddonForm({ naam: addon.naam, beschrijving: addon.beschrijving ?? '', prijs_per_maand: addon.prijs_per_maand, eenheid: addon.eenheid }) }}
+                      className="px-3 py-1.5 rounded-full bg-black/[0.06] text-[12px] font-medium hover:bg-black/10 transition-all">
+                      Bewerken
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Add-ons per klant */}
+            <div className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] overflow-hidden">
+              <div className="px-5 py-4 border-b border-black/[0.05]">
+                <div className="text-[14px] font-semibold">Add-ons per klant</div>
+                <div className="text-[12px] text-[#6e6e73] mt-0.5">Schakel add-ons in of uit per klant</div>
+              </div>
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-black/[0.05] bg-[#f5f5f7]">
+                    <th className="px-4 py-3 text-[11px] font-semibold text-[#6e6e73] uppercase tracking-[0.06em] text-left">Klant</th>
+                    {addons.map(a => (
+                      <th key={a.id} className="px-4 py-3 text-[11px] font-semibold text-[#6e6e73] uppercase tracking-[0.06em] text-center">{a.naam}</th>
+                    ))}
+                    <th className="px-4 py-3 text-[11px] font-semibold text-[#6e6e73] uppercase tracking-[0.06em] text-right">Add-on MRR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {organisaties.map((org, i) => {
+                    const addonMRR = orgAddons.filter(oa => oa.organisatie_id === org.id && oa.actief).reduce((s, oa) => {
+                      const a = addons.find(a => a.id === oa.addon_id)
+                      return s + (a?.prijs_per_maand ?? 0) * oa.aantal
+                    }, 0)
+                    return (
+                      <tr key={org.id} className={"transition-all " + (i < organisaties.length-1 ? 'border-b border-black/[0.05]' : '')}>
+                        <td className="px-4 py-3">
+                          <div className="text-[13px] font-medium">{org.naam}</div>
+                          <div className="text-[11px] text-[#6e6e73]">{org.licentie_type}</div>
+                        </td>
+                        {addons.map(addon => {
+                          const orgAddon = orgAddons.find(oa => oa.organisatie_id === org.id && oa.addon_id === addon.id && oa.actief)
+                          return (
+                            <td key={addon.id} className="px-4 py-3 text-center">
+                              <button onClick={() => toggleOrgAddon(org.id, addon.id, orgAddon ? orgAddon.aantal : 1, !orgAddon)}
+                                className={"w-10 h-6 rounded-full transition-all relative " + (orgAddon ? 'bg-[#0071e3]' : 'bg-[#e8e8ed]')}>
+                                <div className={"absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all " + (orgAddon ? 'left-[18px]' : 'left-0.5')} />
+                              </button>
+                            </td>
+                          )
+                        })}
+                        <td className="px-4 py-3 text-right text-[13px] font-medium">
+                          {addonMRR > 0 ? '€' + addonMRR + '/mnd' : <span className="text-[#aeaeb2]">-</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Instellingen */}
         {nav === 'instellingen' && (
           <div className="p-8 max-w-[600px]">
@@ -540,6 +688,35 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
               <button onClick={() => { setShowNieuw(false); setError('') }} className="flex-1 py-2.5 rounded-full bg-black/[0.06] text-[13px] font-medium hover:bg-black/10">Annuleren</button>
               <button onClick={handleCreate} disabled={saving} className="flex-1 py-2.5 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] disabled:opacity-50">
                 {saving ? 'Aanmaken...' : 'Klant aanmaken'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Edit addon modal */}
+      {editAddon && (
+        <>
+          <div className="fixed inset-0 bg-black/[0.4] backdrop-blur-[4px] z-[200]" onClick={() => setEditAddon(null)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] bg-white rounded-[20px] shadow-[0_12px_40px_rgba(0,0,0,0.2)] w-[440px] p-6">
+            <div className="text-[18px] font-bold mb-1">Add-on bewerken</div>
+            <div className="text-[13px] text-[#6e6e73] mb-5">{editAddon.naam}</div>
+            <div className="flex flex-col gap-3">
+              <Field label="Naam" value={String(editAddonForm.naam ?? '')} onChange={v => setEditAddonForm(p => ({...p, naam: v}))} />
+              <div>
+                <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Beschrijving</label>
+                <textarea value={String(editAddonForm.beschrijving ?? '')} onChange={e => setEditAddonForm(p => ({...p, beschrijving: e.target.value}))} rows={2}
+                  className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all resize-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <NumField label="Prijs per maand (€)" value={Number(editAddonForm.prijs_per_maand ?? 0)} onChange={v => setEditAddonForm(p => ({...p, prijs_per_maand: v}))} />
+                <Field label="Eenheid" value={String(editAddonForm.eenheid ?? '')} onChange={v => setEditAddonForm(p => ({...p, eenheid: v}))} />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setEditAddon(null)} className="flex-1 py-2.5 rounded-full bg-black/[0.06] text-[13px] font-medium hover:bg-black/10">Annuleren</button>
+              <button onClick={handleSaveAddon} disabled={savingEdit} className="flex-1 py-2.5 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] disabled:opacity-50">
+                {savingEdit ? 'Opslaan...' : 'Opslaan'}
               </button>
             </div>
           </div>

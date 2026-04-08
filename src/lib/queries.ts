@@ -160,44 +160,6 @@ export async function createKavel(data: {
 }
 
 // ── updateKavel ───────────────────────────────────────────────
-export async function updateKavel(id: string, updates: Partial<Kavel>): Promise<void> {
-  const supabase = createClient()
-  await supabase.from('kavels').update(updates).eq('id', id)
-}
-
-// ── upsertKavelStatus ─────────────────────────────────────────
-export async function upsertKavelStatus(kavelId: string, status: KavelStatus): Promise<void> {
-  const supabase = createClient()
-  await supabase.from('kavel_status').upsert({ kavel_id: kavelId, ...status }, { onConflict: 'kavel_id' })
-}
-
-// ── upsertKavelOpties ─────────────────────────────────────────
-export async function upsertKavelOpties(kavelId: string, opties: KavelOpties): Promise<void> {
-  const supabase = createClient()
-  await supabase.from('kavel_opties').upsert({ kavel_id: kavelId, ...opties }, { onConflict: 'kavel_id' })
-}
-
-// ── getOwners ─────────────────────────────────────────────────
-export async function getOwners(parkId: string): Promise<Owner[]> {
-  const supabase = createClient()
-  const { data } = await supabase.from('owners').select('*').eq('park_id', parkId).order('name')
-  return data ?? []
-}
-
-// ── createOwner ───────────────────────────────────────────────
-export async function createOwner(data: Partial<Owner>): Promise<Owner | null> {
-  const supabase = createClient()
-  const { data: created } = await supabase.from('owners').insert(data).select('*').single()
-  return created
-}
-
-// ── updateOwner ───────────────────────────────────────────────
-export async function updateOwner(id: string, updates: Partial<Owner>): Promise<void> {
-  const supabase = createClient()
-  await supabase.from('owners').update(updates).eq('id', id)
-}
-
-// ── verkoopKavel ─────────────────────────────────────────────
 export async function verkoopKavel(kavelId: string, ownerId: string, parkId: string): Promise<void> {
   const supabase = createClient()
   await supabase.from('kavels').update({ verkocht: true, owner_id: ownerId }).eq('id', kavelId)

@@ -622,7 +622,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
               </div>
               <div>
                 <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Features (één per regel)</label>
-                <textarea value={(editPakketForm.features ?? []).join(String.fromCharCode(10))} onChange={e => setEditPakketForm(p => ({...p, features: e.target.value.split(String.fromCharCode(10)).filter(f => f.trim())}))}
+                <textarea value={(editPakketForm.features ?? []).join(String.fromCharCode(10))} onChange={e => setEditPakketForm(p => ({...p, features: e.target.value.split(String.fromCharCode(10))}))} onKeyDown={e => e.key === 'Enter' && e.stopPropagation()}
                   rows={5} className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] outline-none focus:border-[#0071e3] focus:bg-white transition-all resize-none font-mono" />
               </div>
             </div>

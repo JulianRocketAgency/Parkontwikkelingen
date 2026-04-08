@@ -654,7 +654,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                                 (isOn ? 'bg-[rgba(0,113,227,0.08)] border-[rgba(0,113,227,0.25)] text-[#004f9e]' : 'bg-[#f5f5f7] border-black/[0.06] text-[#6e6e73] hover:bg-[#e8e8ed]')}>
                               <div className={"w-3.5 h-3.5 rounded-full flex-shrink-0 " + (isOn ? 'bg-[#0071e3]' : 'bg-[#d1d1d6]')} />
                               {addon.naam}
-                              {isOn && <span className="text-[10px] text-[#0071e3]">€{addon.prijs_per_maand}/mnd</span>}
+                              {isOn && <span className="text-[10px] font-medium text-[#0071e3]">Toegang</span>}
                             </button>
                           )
                         })}

@@ -128,7 +128,7 @@ function NumField({ label, value, onChange }: { label: string; value: number; on
 }
 
 export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins, pakketten: initialPakketten, addons: initialAddons, orgAddons: initialOrgAddons }: Props) {
-  const [nav, setNav] = useState<'dashboard' | 'klanten' | 'licenties' | 'addons' | 'gebruikers' | 'instellingen'>('dashboard')
+  const [nav, setNav] = useState<'dashboard' | 'klanten' | 'licenties' | 'addons' | 'rechten' | 'gebruikers' | 'instellingen'>('dashboard')
   const [selectedOrg, setSelectedOrg] = useState<Organisatie | null>(null)
   const [organisaties, setOrganisaties] = useState(initialOrgs)
   const [pakketten, setPakketten] = useState(initialPakketten)
@@ -269,6 +269,7 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
     { key: 'licenties', label: 'Licenties', icon: Package },
     { key: 'gebruikers', label: 'Gebruikers', icon: Users },
     { key: 'addons', label: 'Add-ons', icon: Package },
+    { key: 'rechten', label: 'Rechten', icon: Settings },
     { key: 'instellingen', label: 'Instellingen', icon: Settings },
   ]
 
@@ -699,6 +700,69 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
                 })}
               </div>
             </div>
+          </div>
+        )}
+
+
+        {/* Rechten */}
+        {nav === 'rechten' && (
+          <div className="p-8 max-w-[800px]">
+            <div className="mb-6">
+              <h1 className="text-[26px] font-bold tracking-[-0.5px]">Rollen & Rechten</h1>
+              <p className="text-[14px] text-[#6e6e73] mt-0.5">Beheer wat elke rol kan zien en doen per park</p>
+            </div>
+
+            {[
+              { rol: 'developer', label: 'Ontwikkelaar', kleur: '#0071e3', beschrijving: 'Volledige toegang tot alle functies' },
+              { rol: 'uitvoerder', label: 'Uitvoerder', kleur: '#30d158', beschrijving: 'Kan kavels beheren en fases starten, geen instellingen' },
+              { rol: 'vakman', label: 'Vakman', kleur: '#ff9f0a', beschrijving: 'Eigen mobiele interface met taken en gereed melden' },
+              { rol: 'eigenaar', label: 'Eigenaar (toekomst)', kleur: '#bf5af2', beschrijving: 'Eigen portaal voor woningkopers' },
+            ].map(({ rol, label, kleur, beschrijving }) => {
+              const RECHTEN_LABELS: Record<string, string> = {
+                dashboard: 'Dashboard', eigenaren: 'Eigenaren', werklieden: 'Werklieden',
+                chat: 'Chat', instellingen: 'Instellingen', tessi: 'Tessi AI',
+                kavel_bewerken: 'Kavels bewerken', kavel_verkopen: 'Kavels verkopen',
+                fase_starten: 'Fase starten', taken_inzien: 'Taken inzien',
+                taken_gereedmelden: 'Taken gereed melden', opmerkingen_inzien: 'Opmerkingen inzien',
+                eigen_kavel_inzien: 'Eigen kavel inzien', betalingen_inzien: 'Betalingen inzien',
+              }
+              return (
+                <div key={rol} className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] p-5 mb-4">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{background: kleur}} />
+                    <div className="text-[15px] font-bold">{label}</div>
+                    {rol === 'vakman' && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.12)] text-[#a05a00]">
+                        Mobiele app
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[12px] text-[#6e6e73] mb-4 ml-6">{beschrijving}</div>
+                  <div className="grid grid-cols-3 gap-2 ml-6">
+                    {Object.entries(RECHTEN_LABELS).map(([key, lbl]) => {
+                      const defaults: Record<string, Record<string, boolean>> = {
+                        developer: { dashboard: true, eigenaren: true, werklieden: true, chat: true, instellingen: true, tessi: true, kavel_bewerken: true, kavel_verkopen: true, fase_starten: true, taken_inzien: true, taken_gereedmelden: true, opmerkingen_inzien: true, eigen_kavel_inzien: true, betalingen_inzien: true },
+                        uitvoerder: { dashboard: true, eigenaren: true, werklieden: true, chat: true, instellingen: false, tessi: true, kavel_bewerken: true, kavel_verkopen: false, fase_starten: true, taken_inzien: true, taken_gereedmelden: false, opmerkingen_inzien: true, eigen_kavel_inzien: false, betalingen_inzien: false },
+                        vakman: { dashboard: false, eigenaren: false, werklieden: false, chat: true, instellingen: false, tessi: false, kavel_bewerken: false, kavel_verkopen: false, fase_starten: false, taken_inzien: true, taken_gereedmelden: true, opmerkingen_inzien: true, eigen_kavel_inzien: false, betalingen_inzien: false },
+                        eigenaar: { dashboard: false, eigenaren: false, werklieden: false, chat: false, instellingen: false, tessi: false, kavel_bewerken: false, kavel_verkopen: false, fase_starten: false, taken_inzien: false, taken_gereedmelden: false, opmerkingen_inzien: false, eigen_kavel_inzien: true, betalingen_inzien: true },
+                      }
+                      const isOn = defaults[rol]?.[key] ?? false
+                      return (
+                        <div key={key} className={"flex items-center gap-2 px-2.5 py-1.5 rounded-[8px] text-[12px] " + (isOn ? 'bg-[rgba(0,113,227,0.06)] text-[#004f9e]' : 'bg-[#f5f5f7] text-[#aeaeb2]')}>
+                          <div className={"w-2 h-2 rounded-full flex-shrink-0 " + (isOn ? 'bg-[#0071e3]' : 'bg-[#d1d1d6]')} />
+                          {lbl}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {rol === 'vakman' && (
+                    <div className="mt-4 ml-6 p-3 bg-[rgba(255,159,10,0.06)] rounded-[10px] text-[12px] text-[#a05a00]">
+                      Vakmannen worden doorgestuurd naar <strong>/vakman</strong> na inloggen — een mobiel-vriendelijke interface met hun taken per categorie.
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 

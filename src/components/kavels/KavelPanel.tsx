@@ -313,29 +313,38 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                         </div>
                       )}
                       {isOpen && (
-                        <div className="px-3 pb-3 border-t border-black/[0.05] mt-1">
+                        <div className="px-3 pb-3 border-t border-black/[0.05] mt-1 flex flex-col gap-2">
+                          <div>
+                            <div className="text-[10px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mt-2 mb-1">Interne opmerking</div>
+                            <textarea
+                              value={entry.notitie ?? ''}
+                              onChange={e => setOptieField(key, 'notitie', e.target.value)}
+                              placeholder="Alleen zichtbaar voor het team..."
+                              rows={2}
+                              className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] resize-none outline-none focus:border-[#0071e3] focus:bg-white transition-all placeholder:text-[#aeaeb2]" />
+                          </div>
                           {(() => {
                             const taak = taken.find(t => t.optie_key === key && t.kavel_id === k.id)
-                            const notitieWaarde = taak?.opmerking_vakman ?? entry.notitie ?? ''
+                            if (!taak) return null
                             return (
-                              <textarea
-                                key={taak?.id ?? key}
-                                defaultValue={notitieWaarde}
-                                onBlur={async e => {
-                                  const val = e.target.value
-                                  // Sla op in beide velden
-                                  setOptieField(key, 'notitie', val)
-                                  if (taak) {
+                              <div>
+                                <div className="text-[10px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-1">Gedeeld met vakman</div>
+                                <textarea
+                                  key={taak.id}
+                                  defaultValue={taak.opmerking_vakman ?? ''}
+                                  onBlur={async e => {
+                                    const val = e.target.value
                                     await fetch('/api/taken/update', {
                                       method: 'POST',
                                       headers: { 'Content-Type': 'application/json' },
                                       body: JSON.stringify({ id: taak.id, opmerking_vakman: val }),
                                     })
                                     setTaken(prev => prev.map(t => t.id === taak.id ? { ...t, opmerking_vakman: val } : t))
-                                  }
-                                }}
-                                placeholder="Notities voor team en vakman..." rows={2}
-                                className="w-full mt-2 bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] resize-none outline-none focus:border-[#0071e3] focus:bg-white transition-all placeholder:text-[#aeaeb2]" />
+                                  }}
+                                  placeholder="Zichtbaar voor team én vakman..."
+                                  rows={2}
+                                  className="w-full bg-[rgba(0,113,227,0.04)] border border-[rgba(0,113,227,0.15)] rounded-[10px] px-3 py-2.5 text-[13px] resize-none outline-none focus:border-[#0071e3] transition-all placeholder:text-[#aeaeb2]" />
+                              </div>
                             )
                           })()}
                         </div>

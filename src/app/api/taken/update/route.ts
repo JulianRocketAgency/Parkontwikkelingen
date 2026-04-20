@@ -10,28 +10,26 @@ export async function POST(req: Request) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const updates: Record<string, unknown> = { status }
-    if (opmerking_vakman !== undefined) updates.opmerking_vakman = opmerking_vakman
-    if (status === 'gereed') {
-      updates.gereed_op = new Date().toISOString()
-      // Zet ook _gereed op de kavel_opties als de taak gereed is
-    }
-    if (status === 'in_uitvoering') {
-      updates.gestart_op = new Date().toISOString()
+    const updates: Record<string, unknown> = {}
+
+    if (status !== undefined) {
+      updates.status = status
+      if (status === 'gereed') updates.gereed_op = new Date().toISOString()
+      if (status === 'in_uitvoering') updates.gestart_op = new Date().toISOString()
     }
 
-    // Haal optie_key op
+    if (opmerking_vakman !== undefined) {
+      updates.opmerking_vakman = opmerking_vakman
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ ok: true })
+    }
+
     const { data: taak } = await supabase
-      .from('taken')
-      .select('optie_key, kavel_id')
-      .eq('id', id)
-      .single()
+      .from('taken').select('optie_key, kavel_id').eq('id', id).single()
 
-    const { error } = await supabase
-      .from('taken')
-      .update(updates)
-      .eq('id', id)
-
+    const { error } = await supabase.from('taken').update(updates).eq('id', id)
     if (error) throw new Error(error.message)
 
     // Als gereed: zet ook _gereed op kavel_opties

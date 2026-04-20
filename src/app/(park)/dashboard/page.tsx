@@ -25,7 +25,7 @@ export default async function DashboardPage() {
     getBetalingen(PARK_ID),
     getVakmanCategorieen(PARK_ID),
     getOptieVakmanKoppelingen(PARK_ID),
-    service.from('taken').select('optie_key, status, kavel_id, opmerking_vakman, gestart_op, gereed_op').eq('park_id', PARK_ID),
+    service.from('taken').select('id, optie_key, status, kavel_id, opmerking_vakman, gestart_op, gereed_op').eq('park_id', PARK_ID),
   ])
 
   return (

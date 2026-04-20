@@ -18,7 +18,7 @@ interface Props {
   onVerkoop: (kavelId: string) => void
   onBetalingTriggered: (b: Betalingstermijn) => void
   vakmanCategorieen?: { id: string; naam: string }[]
-  taken?: { optie_key: string | null; status: string; kavel_id: string; opmerking_vakman: string | null; gestart_op: string | null; gereed_op: string | null }[]
+  taken?: { id: string; optie_key: string | null; status: string; kavel_id: string; opmerking_vakman: string | null; gestart_op: string | null; gereed_op: string | null }[]
   optieKoppelingen?: Record<string, string>
 }
 

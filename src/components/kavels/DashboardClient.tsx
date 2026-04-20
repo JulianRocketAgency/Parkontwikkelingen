@@ -20,7 +20,7 @@ interface Props {
   betalingen: Betalingstermijn[]
   vakmanCategorieen?: { id: string; naam: string }[]
   optieKoppelingen?: Record<string, string>
-  taken?: { optie_key: string | null; status: string; kavel_id: string; opmerking_vakman: string | null; gestart_op: string | null; gereed_op: string | null }[]
+  taken?: { id: string; optie_key: string | null; status: string; kavel_id: string; opmerking_vakman: string | null; gestart_op: string | null; gereed_op: string | null }[]
 }
 
 const PARK_ID = '11111111-0000-0000-0000-000000000001'

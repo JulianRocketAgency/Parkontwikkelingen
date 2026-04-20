@@ -7,8 +7,11 @@ interface Profile {
   id: string
   full_name: string | null
   naam: string | null
+  voornaam: string | null
+  achternaam: string | null
   email: string | null
   role: string | null
+  subrol: string | null
   avatar_color: string | null
   vakman_categorie_id: string | null
 }
@@ -18,21 +21,36 @@ interface Props {
   vakmanCategorieen: VakmanCategorie[]
 }
 
-const ROLES = ['developer', 'projectleider', 'planner', 'vakman', 'koper']
+const ROLES = ['ontwikkelaar', 'medewerker', 'vakman', 'koper']
+
 const ROLE_LABELS: Record<string, string> = {
-  developer: 'Ontwikkelaar', projectleider: 'Projectleider',
-  planner: 'Planner', vakman: 'Vakman', koper: 'Koper',
+  ontwikkelaar: 'Ontwikkelaar',
+  medewerker: 'Medewerker',
+  vakman: 'Vakman',
+  koper: 'Koper',
 }
+
 const ROLE_COLORS: Record<string, string> = {
-  developer: 'bg-[rgba(0,113,227,0.10)] text-[#004f9e]',
-  projectleider: 'bg-[rgba(48,209,88,0.13)] text-[#1a7a32]',
-  planner: 'bg-[rgba(191,90,242,0.12)] text-[#7a1fa5]',
-  vakman: 'bg-[rgba(255,159,10,0.12)] text-[#a05a00]',
-  koper: 'bg-[rgba(174,174,178,0.15)] text-[#6e6e73]',
+  ontwikkelaar: 'bg-[rgba(0,113,227,0.10)] text-[#004f9e]',
+  medewerker:   'bg-[rgba(48,209,88,0.13)] text-[#1a7a32]',
+  vakman:       'bg-[rgba(255,159,10,0.12)] text-[#a05a00]',
+  koper:        'bg-[rgba(191,90,242,0.12)] text-[#7a1fa5]',
+}
+
+const ROLE_DOT: Record<string, string> = {
+  ontwikkelaar: '#0071e3',
+  medewerker:   '#30d158',
+  vakman:       '#ff9f0a',
+  koper:        '#bf5af2',
 }
 
 function initials(name: string) {
   return name.split(/[\s\-]+/).filter(Boolean).slice(0,2).map(x => x[0].toUpperCase()).join('')
+}
+
+function displayName(p: Profile) {
+  if (p.voornaam) return [p.voornaam, p.achternaam].filter(Boolean).join(' ')
+  return p.naam ?? p.full_name ?? p.email ?? 'Onbekend'
 }
 
 export function WerkliedenClient({ profiles: initial, vakmanCategorieen }: Props) {
@@ -40,170 +58,234 @@ export function WerkliedenClient({ profiles: initial, vakmanCategorieen }: Props
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [toast, setToast] = useState('')
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState({ naam: '', email: '', wachtwoord: '', role: 'vakman', vakman_categorie_id: '' })
+  const [form, setForm] = useState({ voornaam: '', achternaam: '', email: '', wachtwoord: '', role: 'medewerker', subrol: '', vakman_categorie_id: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const supabase = createClient()
 
   const grouped = ROLES.reduce((acc, role) => {
-    acc[role] = profiles.filter(p => (p.role ?? 'vakman') === role)
+    acc[role] = profiles.filter(p => (p.role ?? 'medewerker') === role)
     return acc
   }, {} as Record<string, Profile[]>)
 
   async function handleCreate() {
-    if (!form.naam || !form.email || !form.wachtwoord) { setError('Vul alle velden in'); return }
+    if (!form.voornaam || !form.email || !form.wachtwoord) {
+      setError('Vul voornaam, email en wachtwoord in'); return
+    }
     setSaving(true); setError('')
     try {
+      const naam = [form.voornaam, form.achternaam].filter(Boolean).join(' ')
       const res = await fetch('/api/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          naam,
+          voornaam: form.voornaam,
+          achternaam: form.achternaam,
+          email: form.email,
+          wachtwoord: form.wachtwoord,
+          role: form.role,
+          subrol: form.subrol || null,
+          vakman_categorie_id: form.vakman_categorie_id || null,
+        }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Aanmaken mislukt')
-      setProfiles(prev => [...prev, data.profile])
+      if (!res.ok) throw new Error(data.error ?? 'Fout bij aanmaken')
+      if (data.user) {
+        setProfiles(prev => [...prev, data.user])
+        setToast('Account aangemaakt')
+        setTimeout(() => setToast(''), 3000)
+      }
       setShowModal(false)
-      setForm({ naam: '', email: '', wachtwoord: '', role: 'vakman', vakman_categorie_id: '' })
-      setToast('Gebruiker aangemaakt ✓')
-      setTimeout(() => setToast(''), 2500)
+      setForm({ voornaam: '', achternaam: '', email: '', wachtwoord: '', role: 'medewerker', subrol: '', vakman_categorie_id: '' })
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Fout opgetreden')
+      setError(e instanceof Error ? e.message : 'Fout')
     } finally { setSaving(false) }
   }
 
-  async function handleUpdate(profileId: string, updates: Partial<Profile>) {
-    await supabase.from('profiles').update(updates).eq('id', profileId)
-    setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, ...updates } : p))
-    setToast('Bijgewerkt ✓')
-    setTimeout(() => setToast(''), 2000)
+  async function handleRolChange(profileId: string, newRole: string) {
+    const { error } = await supabase.from('profiles').update({ role: newRole as 'ontwikkelaar' | 'medewerker' | 'vakman' | 'koper' }).eq('id', profileId)
+    if (!error) {
+      setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, role: newRole } : p))
+      setToast('Rol bijgewerkt')
+      setTimeout(() => setToast(''), 3000)
+    }
+  }
+
+  async function handleVakmanTypeChange(profileId: string, vakmanCategorieId: string) {
+    const { error } = await supabase.from('profiles').update({ vakman_categorie_id: vakmanCategorieId || null }).eq('id', profileId)
+    if (!error) {
+      setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, vakman_categorie_id: vakmanCategorieId } : p))
+    }
   }
 
   return (
-    <div className="p-7 max-w-[900px]">
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[rgba(29,29,31,0.9)] backdrop-blur-xl text-white px-5 py-2.5 rounded-full text-[13px] font-medium z-50">{toast}</div>
-      )}
-      <div className="flex items-start justify-between mb-6">
+    <div className="p-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-[26px] font-bold tracking-[-0.5px]">Werklieden</h1>
           <p className="text-[14px] text-[#6e6e73] mt-0.5">Accounts, rollen en vakman types</p>
         </div>
         <button onClick={() => setShowModal(true)}
-          className="px-4 py-1.5 rounded-full text-[13px] font-medium bg-[#0071e3] text-white hover:bg-[#0077ed] transition-all">
+          className="px-5 py-2.5 bg-[#0071e3] text-white text-[14px] font-medium rounded-full hover:bg-[#0077ed] transition-all">
           + Toevoegen
         </button>
       </div>
 
       <div className="flex flex-col gap-4">
         {ROLES.map(role => {
-          const members = grouped[role] ?? []
+          const roleProfiles = grouped[role] ?? []
+          const isCollapsed = collapsed[role]
           return (
             <div key={role} className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] overflow-hidden">
-              <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-black/[0.05] cursor-pointer hover:bg-black/[0.02] transition-all select-none"
-                onClick={() => setCollapsed(prev => ({...prev, [role]: !prev[role]}))}>
-                <span className="text-[11px] text-[#aeaeb2] transition-transform" style={{display:'inline-block', transform: collapsed[role] ? 'rotate(-90deg)' : 'rotate(0deg)'}}>▼</span>
-                <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${ROLE_COLORS[role]}`}>{ROLE_LABELS[role]}</span>
-                <span className="text-[12px] text-[#aeaeb2]">{members.length} accounts</span>
-              </div>
-              {!collapsed[role] && (members.length === 0 ? (
-                <div className="px-5 py-4 text-[13px] text-[#aeaeb2]">Geen accounts met deze rol</div>
-              ) : (
-                <div className="divide-y divide-black/[0.05]">
-                  {members.map(p => {
-                    const name = p.naam ?? p.full_name ?? p.email ?? 'Onbekend'
-                    const vakmanCat = vakmanCategorieen.find(c => c.id === p.vakman_categorie_id)
-                    return (
-                      <div key={p.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-black/[0.02] transition-all">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold text-white flex-shrink-0"
-                          style={{ background: p.avatar_color ?? '#0071e3' }}>{initials(name)}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] font-medium text-[#1d1d1f]">{name}</div>
-                          <div className="text-[11px] text-[#6e6e73]">{p.email ?? ''}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {/* Rol badge */}
-                          <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${ROLE_COLORS[p.role ?? 'vakman']}`}>
-                            {ROLE_LABELS[p.role ?? 'vakman']}
-                          </span>
-                          {/* Vakman type — alleen tonen/instellen bij vakman rol */}
-                          {p.role === 'vakman' && (
-                            <select
-                              value={p.vakman_categorie_id ?? ''}
-                              onChange={e => handleUpdate(p.id, { vakman_categorie_id: e.target.value || null })}
-                              className="bg-[rgba(255,159,10,0.08)] border border-[rgba(255,159,10,0.2)] rounded-full px-2.5 py-1 text-[11px] font-medium text-[#a05a00] outline-none focus:border-[#ff9f0a] transition-all">
-                              <option value="">Type vakman...</option>
-                              {vakmanCategorieen.map(c => <option key={c.id} value={c.id}>{c.naam}</option>)}
-                            </select>
-                          )}
-                          {vakmanCat && p.role !== 'vakman' && (
-                            <span className="text-[11px] px-2.5 py-1 rounded-full bg-[rgba(255,159,10,0.08)] text-[#a05a00] border border-[rgba(255,159,10,0.2)]">
-                              {vakmanCat.naam}
+              <button onClick={() => setCollapsed(p => ({ ...p, [role]: !p[role] }))}
+                className="w-full flex items-center gap-3 px-5 py-4 hover:bg-[#f9f9f9] transition-all">
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{background: ROLE_DOT[role]}} />
+                <span className={"text-[12px] font-bold px-2.5 py-1 rounded-full " + (ROLE_COLORS[role] ?? '')}>
+                  {ROLE_LABELS[role]}
+                </span>
+                <span className="text-[13px] text-[#6e6e73]">{roleProfiles.length} accounts</span>
+                <span className="ml-auto text-[#aeaeb2] text-[18px]">{isCollapsed ? '▸' : '▾'}</span>
+              </button>
+
+              {!isCollapsed && (
+                <div className="border-t border-black/[0.05]">
+                  {roleProfiles.length === 0 ? (
+                    <p className="px-5 py-4 text-[13px] text-[#aeaeb2]">Geen accounts met deze rol</p>
+                  ) : (
+                    roleProfiles.map((profile, i) => {
+                      const name = displayName(profile)
+                      const vakmanCat = vakmanCategorieen.find(v => v.id === profile.vakman_categorie_id)
+                      return (
+                        <div key={profile.id}
+                          className={"flex items-center gap-4 px-5 py-3.5 " + (i < roleProfiles.length - 1 ? 'border-b border-black/[0.04]' : '')}>
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold text-white flex-shrink-0"
+                            style={{background: profile.avatar_color ?? ROLE_DOT[role] ?? '#6e6e73'}}>
+                            {initials(name)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[14px] font-medium text-[#1d1d1f] truncate">{name}</div>
+                            <div className="text-[12px] text-[#6e6e73] truncate">{profile.email}</div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className={"text-[11px] font-semibold px-2 py-0.5 rounded-full " + (ROLE_COLORS[role] ?? '')}>
+                              {ROLE_LABELS[role] ?? role}
                             </span>
-                          )}
+                            {role === 'vakman' && (
+                              <select
+                                value={profile.vakman_categorie_id ?? ''}
+                                onChange={e => handleVakmanTypeChange(profile.id, e.target.value)}
+                                className="text-[12px] border border-black/[0.1] rounded-full px-3 py-1 bg-white outline-none cursor-pointer hover:border-[#0071e3] transition-all">
+                                <option value="">Type vakman...</option>
+                                {vakmanCategorieen.map(v => (
+                                  <option key={v.id} value={v.id}>{v.naam}</option>
+                                ))}
+                              </select>
+                            )}
+                            {role === 'medewerker' && profile.subrol && (
+                              <span className="text-[11px] text-[#6e6e73] px-2 py-0.5 rounded-full bg-[#f5f5f7]">{profile.subrol}</span>
+                            )}
+                            <select
+                              value={profile.role ?? ''}
+                              onChange={e => handleRolChange(profile.id, e.target.value)}
+                              className="text-[12px] border border-black/[0.1] rounded-full px-3 py-1 bg-white outline-none cursor-pointer hover:border-[#0071e3] transition-all">
+                              {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                            </select>
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })
+                  )}
                 </div>
-              ))}
+              )}
             </div>
           )
         })}
       </div>
 
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1d1d1f] text-white text-[13px] font-medium px-5 py-2.5 rounded-full shadow-lg z-50">
+          {toast}
+        </div>
+      )}
+
       {/* Modal */}
       {showModal && (
         <>
-          <div className="fixed inset-0 bg-black/[0.22] backdrop-blur-[4px] z-[200]" onClick={() => setShowModal(false)} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] bg-white rounded-[20px] shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-black/[0.05] w-[420px] p-6">
-            <div className="text-[16px] font-bold mb-1">Gebruiker toevoegen</div>
-            <div className="text-[13px] text-[#6e6e73] mb-5">Maak een nieuw account aan en wijs een rol toe.</div>
+          <div className="fixed inset-0 bg-black/[0.3] backdrop-blur-[4px] z-[100]" onClick={() => setShowModal(false)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] bg-white rounded-[20px] shadow-[0_12px_40px_rgba(0,0,0,0.15)] w-[460px] p-6">
+            <div className="text-[18px] font-bold mb-1">Nieuw account</div>
+            <div className="text-[13px] text-[#6e6e73] mb-5">Maak een nieuw account aan voor dit park</div>
             <div className="flex flex-col gap-3">
-              <div>
-                <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Naam</label>
-                <input value={form.naam} onChange={e => setForm(p => ({...p, naam: e.target.value}))}
-                  placeholder="Voor- en achternaam"
-                  className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">E-mailadres</label>
-                <input type="email" value={form.email} onChange={e => setForm(p => ({...p, email: e.target.value}))}
-                  placeholder="naam@voorbeeld.nl"
-                  className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Tijdelijk wachtwoord</label>
-                <input type="password" value={form.wachtwoord} onChange={e => setForm(p => ({...p, wachtwoord: e.target.value}))}
-                  placeholder="Minimaal 6 tekens"
-                  className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Rol</label>
-                <select value={form.role} onChange={e => setForm(p => ({...p, role: e.target.value, vakman_categorie_id: ''}))}
-                  className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] transition-all">
-                  {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                </select>
-              </div>
-              {form.role === 'vakman' && vakmanCategorieen.length > 0 && (
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Type vakman</label>
-                  <select value={form.vakman_categorie_id} onChange={e => setForm(p => ({...p, vakman_categorie_id: e.target.value}))}
-                    className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] transition-all">
-                    <option value="">Selecteer type...</option>
-                    {vakmanCategorieen.map(c => <option key={c.id} value={c.id}>{c.naam}</option>)}
+                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Voornaam *</label>
+                  <input value={form.voornaam} onChange={e => setForm(p => ({...p, voornaam: e.target.value}))}
+                    placeholder="Jan"
+                    className="w-full bg-[#f5f5f7] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:ring-2 focus:ring-[#0071e3] transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Achternaam</label>
+                  <input value={form.achternaam} onChange={e => setForm(p => ({...p, achternaam: e.target.value}))}
+                    placeholder="de Vries"
+                    className="w-full bg-[#f5f5f7] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:ring-2 focus:ring-[#0071e3] transition-all" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Email *</label>
+                <input type="email" value={form.email} onChange={e => setForm(p => ({...p, email: e.target.value}))}
+                  placeholder="jan@bedrijf.nl"
+                  className="w-full bg-[#f5f5f7] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:ring-2 focus:ring-[#0071e3] transition-all" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Wachtwoord *</label>
+                <input type="password" value={form.wachtwoord} onChange={e => setForm(p => ({...p, wachtwoord: e.target.value}))}
+                  placeholder="Minimaal 8 tekens"
+                  className="w-full bg-[#f5f5f7] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:ring-2 focus:ring-[#0071e3] transition-all" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Rol</label>
+                  <select value={form.role} onChange={e => setForm(p => ({...p, role: e.target.value, subrol: '', vakman_categorie_id: ''}))}
+                    className="w-full bg-[#f5f5f7] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:ring-2 focus:ring-[#0071e3] transition-all">
+                    <option value="ontwikkelaar">Ontwikkelaar</option>
+                    <option value="medewerker">Medewerker</option>
+                    <option value="vakman">Vakman</option>
+                    <option value="koper">Koper</option>
                   </select>
                 </div>
+                {form.role === 'vakman' && (
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Type vakman</label>
+                    <select value={form.vakman_categorie_id} onChange={e => setForm(p => ({...p, vakman_categorie_id: e.target.value}))}
+                      className="w-full bg-[#f5f5f7] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:ring-2 focus:ring-[#0071e3] transition-all">
+                      <option value="">Selecteer type</option>
+                      {vakmanCategorieen.map(v => <option key={v.id} value={v.id}>{v.naam}</option>)}
+                    </select>
+                  </div>
+                )}
+                {form.role === 'medewerker' && (
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Type medewerker</label>
+                    <input value={form.subrol} onChange={e => setForm(p => ({...p, subrol: e.target.value}))}
+                      placeholder="bijv. Uitvoerder"
+                      className="w-full bg-[#f5f5f7] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:ring-2 focus:ring-[#0071e3] transition-all" />
+                  </div>
+                )}
+              </div>
+              {error && (
+                <div className="text-[12px] text-[#ff3b30] bg-[rgba(255,59,48,0.08)] rounded-[10px] px-3 py-2">{error}</div>
               )}
-              {error && <div className="text-[12px] text-[#ff3b30] bg-[rgba(255,59,48,0.08)] rounded-[8px] px-3 py-2">{error}</div>}
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={() => { setShowModal(false); setError('') }}
-                className="flex-1 py-2.5 rounded-full bg-black/[0.06] text-[#3a3a3c] text-[13px] font-medium hover:bg-black/10">
+                className="flex-1 py-2.5 rounded-full bg-black/[0.06] text-[13px] font-medium hover:bg-black/10 transition-all">
                 Annuleren
               </button>
               <button onClick={handleCreate} disabled={saving}
-                className="flex-1 py-2.5 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] disabled:opacity-50">
-                {saving ? 'Aanmaken...' : 'Aanmaken'}
+                className="flex-1 py-2.5 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] disabled:opacity-50 transition-all">
+                {saving ? 'Aanmaken...' : 'Account aanmaken'}
               </button>
             </div>
           </div>

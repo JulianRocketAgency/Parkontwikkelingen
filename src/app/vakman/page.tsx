@@ -22,13 +22,18 @@ export default async function VakmanPage() {
 
   if (!profile || profile.role !== 'vakman') redirect('/dashboard')
 
-  const { data: taken } = await service
+  // Haal taken op - als geen vakman_categorie_id, toon alle taken van het park
+  let takenQuery = service
     .from('taken')
     .select('*, kavels(number, type, uitvoering, fase), vakman_categorieen(naam)')
     .eq('park_id', profile.park_id)
-    .eq('vakman_categorie_id', profile.vakman_categorie_id)
-    .order('prioriteit', { ascending: false })
     .order('created_at', { ascending: true })
+
+  if (profile.vakman_categorie_id) {
+    takenQuery = takenQuery.eq('vakman_categorie_id', profile.vakman_categorie_id)
+  }
+
+  const { data: taken } = await takenQuery
 
   const { data: park } = await service
     .from('parks')

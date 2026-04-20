@@ -12,6 +12,8 @@ interface Taak {
   deadline: string | null
   gereed_op: string | null
   opmerking_vakman: string | null
+  geblokkeerd: boolean | null
+  blokkeer_reden: string | null
   kavels: { number: number; type: string; uitvoering: string; fase: number } | null
   vakman_categorieen: { naam: string } | null
 }
@@ -49,7 +51,7 @@ function initials(name: string) {
 
 export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) {
   const [taken, setTaken] = useState(initialTaken)
-  const [filter, setFilter] = useState<'open' | 'in_uitvoering' | 'gereed'>( 'open')
+  const [filter, setFilter] = useState<'open' | 'in_uitvoering' | 'gereed' | 'geblokkeerd'>('open')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [opmerking, setOpmerking] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState<string | null>(null)
@@ -57,9 +59,13 @@ export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) 
   const naam = profile.naam ?? 'Vakman'
   const categorie = profile.vakman_categorieen?.naam ?? ''
 
-  const gefilterd = taken.filter(t => t.status === filter)
-  const openCount = taken.filter(t => t.status === 'open').length
+  const geblokkeerd = taken.filter(t => t.geblokkeerd === true && t.status === 'open')
+  const gefilterd = filter === 'geblokkeerd'
+    ? geblokkeerd
+    : taken.filter(t => t.status === filter && !t.geblokkeerd)
+  const openCount = taken.filter(t => t.status === 'open' && !t.geblokkeerd).length
   const bezigCount = taken.filter(t => t.status === 'in_uitvoering').length
+  const geblokkeerdCount = geblokkeerd.length
 
   async function updateStatus(taakId: string, status: string) {
     setSaving(taakId)
@@ -101,6 +107,7 @@ export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) 
             { label: 'Open', count: openCount, color: '#ff9f0a' },
             { label: 'Bezig', count: bezigCount, color: '#0071e3' },
             { label: 'Gereed', count: taken.filter(t=>t.status==='gereed').length, color: '#30d158' },
+            { label: 'Wacht', count: geblokkeerdCount, color: '#aeaeb2' },
           ].map(({ label, count, color }) => (
             <div key={label} className="bg-[#f2f2f7] rounded-[12px] px-3 py-2 text-center">
               <div className="text-[20px] font-bold" style={{color}}>{count}</div>
@@ -111,12 +118,13 @@ export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) 
 
         {/* Filter tabs */}
         <div className="flex gap-1 bg-[#f2f2f7] rounded-[10px] p-1">
-          {(['open', 'in_uitvoering', 'gereed'] as const).map(s => (
+          {(['open', 'in_uitvoering', 'gereed', 'geblokkeerd'] as const).map(s => (
             <button key={s} onClick={() => setFilter(s)}
               className={"flex-1 py-1.5 rounded-[8px] text-[12px] font-semibold transition-all " +
                 (filter === s ? 'bg-white text-[#1d1d1f] shadow-sm' : 'text-[#6e6e73]')}>
-              {STATUS_CONFIG[s].label}
+              {s === 'geblokkeerd' ? 'Wacht' : STATUS_CONFIG[s].label}
               {s === 'open' && openCount > 0 && <span className="ml-1 text-[10px] text-[#ff9f0a]">{openCount}</span>}
+              {s === 'geblokkeerd' && geblokkeerdCount > 0 && <span className="ml-1 text-[10px] text-[#aeaeb2]">{geblokkeerdCount}</span>}
             </button>
           ))}
         </div>
@@ -165,6 +173,14 @@ export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) 
                     {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
                 </div>
+
+                {/* Geblokkeerd banner */}
+                {taak.geblokkeerd && taak.blokkeer_reden && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-[rgba(174,174,178,0.12)] rounded-[8px] mb-2 text-[12px] text-[#6e6e73]">
+                    <span>⏳</span>
+                    <span>{taak.blokkeer_reden}</span>
+                  </div>
+                )}
 
                 {/* Kavel info */}
                 {taak.kavels && (

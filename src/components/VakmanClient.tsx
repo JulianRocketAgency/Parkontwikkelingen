@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { CheckCircle, Clock, AlertCircle, ChevronDown, ChevronUp, MapPin, MessageSquare, Home, MessageCircle, X } from 'lucide-react'
+import { CheckCircle, Clock, AlertCircle, ChevronDown, ChevronUp, MapPin, MessageSquare, Home, X } from 'lucide-react'
 
 interface Taak {
   id: string
@@ -54,7 +54,6 @@ export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) 
   const [filter, setFilter] = useState<'open' | 'in_uitvoering' | 'gereed' | 'geblokkeerd'>('open')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [opmerking, setOpmerking] = useState<Record<string, string>>({})
-  const [showChat, setShowChat] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
 
   const naam = profile.naam ?? 'Vakman'
@@ -97,14 +96,9 @@ export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) 
             <div className="text-[17px] font-bold tracking-[-0.3px]">{naam}</div>
             <div className="text-[13px] text-[#6e6e73]">{categorie} · {parkNaam}</div>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => setShowChat(true)} className="p-2 rounded-full bg-[#f2f2f7] relative">
-              <MessageCircle size={16} className="text-[#0071e3]" />
-            </button>
-            <a href="/dashboard" className="p-2 rounded-full bg-[#f2f2f7]">
-              <Home size={16} className="text-[#6e6e73]" />
-            </a>
-          </div>
+          <a href="/dashboard" className="ml-auto p-2 rounded-full bg-[#f2f2f7]">
+            <Home size={16} className="text-[#6e6e73]" />
+          </a>
         </div>
 
         {/* Stats */}
@@ -257,22 +251,6 @@ export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) 
         })}
       </div>
 
-      {/* Chat overlay */}
-      {showChat && (
-        <div className="fixed inset-0 z-[300] flex flex-col bg-white">
-          <div className="flex items-center gap-3 px-4 py-4 border-b border-black/[0.08] pt-12">
-            <button onClick={() => setShowChat(false)} className="p-2 rounded-full bg-[#f2f2f7]">
-              <X size={16} className="text-[#6e6e73]" />
-            </button>
-            <div className="text-[16px] font-bold">Chat</div>
-          </div>
-          <iframe
-            src="/chat"
-            className="flex-1 w-full border-0"
-            title="Chat"
-          />
-        </div>
-      )}
     </div>
   )
 }

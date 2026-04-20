@@ -19,6 +19,7 @@ interface Props {
   vakmanCategorieen?: VakmanCategorie[]
   optieCategorieen?: OptieCategorie[]
   initialKoppelingen?: Record<string, string>
+  parkOpties?: { id: string; slug: string; label: string; volgorde: number }[]
 }
 type Pt = { x: number; y: number }
 const PARK_ID = '11111111-0000-0000-0000-000000000001'
@@ -44,7 +45,7 @@ async function pdfToImageUrl(file: File): Promise<string> {
   return url
 }
 
-export function InstellingenClient({ park, kavels: initial, allParks = [], vakmanCategorieen = [], optieCategorieen = [], initialKoppelingen = {} }: Props) {
+export function InstellingenClient({ park, kavels: initial, allParks = [], vakmanCategorieen = [], optieCategorieen = [], initialKoppelingen = {}, parkOpties = [] }: Props) {
   const [kavels, setKavels] = useState(initial)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingFase, setEditingFase] = useState<number | null>(null)

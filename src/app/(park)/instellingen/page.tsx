@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { getPark, getKavels, getParkMaps, getOptieCategorieen, getVakmanCategorieen, getOptieVakmanKoppelingen } from '@/lib/queries'
 import { InstellingenClient } from '@/components/InstellingenClient'
 import { redirect } from 'next/navigation'
@@ -10,7 +11,12 @@ export default async function InstellingenPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [park, kavels, parkMaps, allParks, optieCategorieen, vakmanCategorieen, koppelingen] = await Promise.all([
+  const service = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+  const [park, kavels, parkMaps, allParks, optieCategorieen, vakmanCategorieen, koppelingen, parkOptiesRes] = await Promise.all([
     getPark(PARK_ID),
     getKavels(PARK_ID),
     getParkMaps(PARK_ID),
@@ -18,6 +24,7 @@ export default async function InstellingenPage() {
     getOptieCategorieen(PARK_ID),
     getVakmanCategorieen(PARK_ID),
     getOptieVakmanKoppelingen(PARK_ID),
+    service.from('park_opties').select('*').eq('park_id', PARK_ID).eq('actief', true).order('volgorde'),
   ])
 
   return (
@@ -29,6 +36,7 @@ export default async function InstellingenPage() {
       optieCategorieen={optieCategorieen}
       vakmanCategorieen={vakmanCategorieen}
       initialKoppelingen={Object.fromEntries(koppelingen.map(k => [k.optie_key, k.vakman_categorie_id]))}
+      parkOpties={parkOptiesRes.data ?? []}
     />
   )
 }

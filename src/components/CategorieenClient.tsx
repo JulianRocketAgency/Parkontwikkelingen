@@ -13,10 +13,40 @@ interface Props {
   vakmanCategorieen: VakmanCategorie[]
   optieKoppelingen: Record<string, string>
   onOptieKoppelingChange: (optieKey: string, categorieId: string) => void
+  parkOpties?: { id: string; slug: string; label: string; volgorde: number }[]
 }
 
-export function CategorieenClient({ vakmanCategorieen: initialVC, optieKoppelingen, onOptieKoppelingChange }: Props) {
+export function CategorieenClient({ vakmanCategorieen: initialVC, optieKoppelingen, onOptieKoppelingChange, parkOpties: initialParkOpties = [] }: Props) {
   const [vakmanCategorieen, setVakmanCategorieen] = useState(initialVC)
+  const [parkOpties, setParkOpties] = useState(initialParkOpties)
+  const [nieuweOptie, setNieuweOptie] = useState('')
+  const [savingOptie, setSavingOptie] = useState(false)
+
+  async function voegOptieToe() {
+    if (!nieuweOptie.trim()) return
+    setSavingOptie(true)
+    try {
+      const res = await fetch('/api/park/optie-toevoegen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ park_id: '11111111-0000-0000-0000-000000000001', label: nieuweOptie.trim() }),
+      })
+      const data = await res.json()
+      if (data.optie) {
+        setParkOpties(prev => [...prev, data.optie])
+        setNieuweOptie('')
+      }
+    } finally { setSavingOptie(false) }
+  }
+
+  async function verwijderOptie(id: string) {
+    await fetch('/api/park/optie-verwijderen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    setParkOpties(prev => prev.filter(o => o.id !== id))
+  }
   const [newVakmanNaam, setNewVakmanNaam] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; naam: string } | null>(null)
   const [deleteInput, setDeleteInput] = useState('')
@@ -44,6 +74,35 @@ export function CategorieenClient({ vakmanCategorieen: initialVC, optieKoppeling
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[rgba(29,29,31,0.9)] backdrop-blur-xl text-white px-5 py-2.5 rounded-full text-[13px] font-medium z-50">{toast}</div>
       )}
+
+      {/* Optie beheer */}
+      <div className="mb-6">
+        <div className="text-[15px] font-semibold mb-1">Opties beheren</div>
+        <div className="text-[13px] text-[#6e6e73] mb-4">Voeg opties toe of verwijder ze voor dit park.</div>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {parkOpties.map(opt => (
+            <div key={opt.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-[rgba(0,113,227,0.08)] rounded-full">
+              <span className="text-[13px] font-medium text-[#004f9e]">{opt.label}</span>
+              <button onClick={() => verwijderOptie(opt.id)}
+                className="w-4 h-4 rounded-full hover:bg-[rgba(255,59,48,0.15)] flex items-center justify-center transition-all text-[#aeaeb2] hover:text-[#ff3b30]">
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={nieuweOptie}
+            onChange={e => setNieuweOptie(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && voegOptieToe()}
+            placeholder="bijv. Jacuzzi, Carport..."
+            className="flex-1 bg-[#f5f5f7] border border-black/[0.06] rounded-full px-4 py-2 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
+          <button onClick={voegOptieToe} disabled={savingOptie || !nieuweOptie.trim()}
+            className="px-4 py-2 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] disabled:opacity-40 transition-all">
+            {savingOptie ? '...' : '+ Toevoegen'}
+          </button>
+        </div>
+      </div>
 
       <div className="text-[15px] font-semibold mb-1">Opties & verantwoordelijke vakman</div>
       <div className="text-[13px] text-[#6e6e73] mb-5">Stel per optie in welk type vakman verantwoordelijk is voor de uitvoering.</div>

@@ -69,6 +69,9 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
     end_date: park?.end_date ?? '',
   })
   const [optieKoppelingen, setOptieKoppelingen] = useState<Record<string, string>>(initialKoppelingen)
+  const [importUnlocked, setImportUnlocked] = useState(false)
+  const [importWachtwoord, setImportWachtwoord] = useState('')
+  const [importWachtwoordFout, setImportWachtwoordFout] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
@@ -288,31 +291,7 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
           </div>
         </div>
 
-        {/* Excel import/export */}
-        <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
-          <div className="text-[15px] font-semibold mb-1">Data import & export</div>
-          <div className="text-[13px] text-[#6e6e73] mb-5">Download een template, vul de kavels en eigenaren in en upload het terug.</div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="border border-dashed border-[#d1d1d6] rounded-[14px] p-5 text-center hover:border-[#0071e3] hover:bg-[rgba(0,113,227,0.02)] transition-all">
-              <div className="text-[24px] mb-2">⬇</div>
-              <div className="text-[13px] font-medium text-[#1d1d1f] mb-1">Download template</div>
-              <div className="text-[12px] text-[#6e6e73] mb-4">Excel bestand met alle kolommen voorbereid</div>
-              <button onClick={() => downloadTemplate()}
-                className="px-5 py-2 rounded-full bg-[#0071e3] text-white text-[12px] font-medium hover:bg-[#0077ed] transition-all">
-                Download .xlsx
-              </button>
-            </div>
-            <div className="border border-dashed border-[#d1d1d6] rounded-[14px] p-5 text-center hover:border-[#0071e3] hover:bg-[rgba(0,113,227,0.02)] transition-all">
-              <div className="text-[24px] mb-2">⬆</div>
-              <div className="text-[13px] font-medium text-[#1d1d1f] mb-1">Data uploaden</div>
-              <div className="text-[12px] text-[#6e6e73] mb-4">Upload het ingevulde Excel bestand</div>
-              <label className="px-5 py-2 rounded-full bg-[#f5f5f7] border border-black/[0.08] text-[#3a3a3c] text-[12px] font-medium hover:bg-[#e8e8ed] transition-all cursor-pointer">
-                Kies bestand
-                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => handleExcelUpload(e)} />
-              </label>
-            </div>
-          </div>
-        </div>
+
 
         {/* Plattegronden */}
         <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] p-6">
@@ -568,6 +547,69 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
               className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
           </div>
           <button onClick={savePark} className="px-5 py-2 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] transition-all">Opslaan</button>
+        </div>
+
+
+        {/* Data import & export — vergrendeld */}
+        <div className="bg-white rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.07)] border border-black/[0.05] overflow-hidden">
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="text-[15px] font-semibold">Data import & export</div>
+              {!importUnlocked && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(174,174,178,0.2)] text-[#6e6e73]">🔒 Vergrendeld</span>
+              )}
+            </div>
+            <div className="text-[13px] text-[#6e6e73] mb-4">
+              {importUnlocked
+                ? 'Download een template, vul de kavels en eigenaren in en upload het terug.'
+                : 'Vraag de developer om op de juiste wijze de data in te voeren. Voer het wachtwoord in om toegang te krijgen.'}
+            </div>
+            {!importUnlocked ? (
+              <div className="flex gap-2 max-w-[400px]">
+                <input
+                  type="password"
+                  value={importWachtwoord}
+                  onChange={e => { setImportWachtwoord(e.target.value); setImportWachtwoordFout(false) }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      if (importWachtwoord === 'developer') { setImportUnlocked(true); setImportWachtwoord('') }
+                      else { setImportWachtwoordFout(true) }
+                    }
+                  }}
+                  placeholder="Wachtwoord..."
+                  className={"flex-1 bg-[#f5f5f7] border rounded-full px-4 py-2 text-[14px] outline-none transition-all " + (importWachtwoordFout ? 'border-[#ff3b30] bg-[rgba(255,59,48,0.05)]' : 'border-black/[0.06] focus:border-[#0071e3] focus:bg-white')} />
+                <button
+                  onClick={() => {
+                    if (importWachtwoord === 'developer') { setImportUnlocked(true); setImportWachtwoord('') }
+                    else { setImportWachtwoordFout(true) }
+                  }}
+                  className="px-4 py-2 rounded-full bg-[#1d1d1f] text-white text-[13px] font-medium hover:bg-black transition-all">
+                  Ontgrendel
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="border border-dashed border-[#d1d1d6] rounded-[14px] p-5 text-center hover:border-[#0071e3] hover:bg-[rgba(0,113,227,0.02)] transition-all">
+                  <div className="text-[24px] mb-2">⬇</div>
+                  <div className="text-[13px] font-medium text-[#1d1d1f] mb-1">Download template</div>
+                  <div className="text-[12px] text-[#6e6e73] mb-4">Excel bestand met alle kolommen voorbereid</div>
+                  <button onClick={() => downloadTemplate()}
+                    className="px-5 py-2 rounded-full bg-[#0071e3] text-white text-[12px] font-medium hover:bg-[#0077ed] transition-all">
+                    Download .xlsx
+                  </button>
+                </div>
+                <div className="border border-dashed border-[#d1d1d6] rounded-[14px] p-5 text-center hover:border-[#0071e3] hover:bg-[rgba(0,113,227,0.02)] transition-all">
+                  <div className="text-[24px] mb-2">⬆</div>
+                  <div className="text-[13px] font-medium text-[#1d1d1f] mb-1">Data uploaden</div>
+                  <div className="text-[12px] text-[#6e6e73] mb-4">Upload het ingevulde Excel bestand</div>
+                  <label className="px-5 py-2 rounded-full bg-[#f5f5f7] border border-black/[0.08] text-[#3a3a3c] text-[12px] font-medium hover:bg-[#e8e8ed] transition-all cursor-pointer">
+                    Kies bestand
+                    <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => handleExcelUpload(e)} />
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
       </div>

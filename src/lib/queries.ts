@@ -153,9 +153,14 @@ export async function updatePark(id: string, updates: Partial<Park>): Promise<vo
 export async function createKavel(data: {
   park_id: string; number: number; fase: number; type: string; uitvoering: string
 }): Promise<Kavel | null> {
-  const supabase = createClient()
-  const { data: created } = await supabase.from('kavels').insert(data).select('*').single()
-  return created
+  const res = await fetch('/api/kavel/aanmaken', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error ?? 'Fout bij aanmaken kavel')
+  return json.kavel
 }
 
 // ── updateKavel ───────────────────────────────────────────────

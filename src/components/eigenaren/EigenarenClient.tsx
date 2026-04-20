@@ -21,11 +21,16 @@ const STATUS_STYLES: Record<Betalingstermijn['status'], { label: string; cls: st
   voldaan:  { label: 'Voldaan',    cls: 'bg-[rgba(48,209,88,0.13)] text-[#1a7a32]' },
 }
 
-export function EigenarenClient({ owners, kavels }: Props) {
+export function EigenarenClient({ owners: initialOwners, kavels }: Props) {
+  const [owners, setOwners] = useState(initialOwners)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterBetaling, setFilterBetaling] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [showNieuw, setShowNieuw] = useState(false)
+  const [nieuwForm, setNieuwForm] = useState({ name: '', email: '', phone: '', address: '' })
+  const [savingNieuw, setSavingNieuw] = useState(false)
+  const [nieuwError, setNieuwError] = useState('')
   const [betalingen, setBetalingen] = useState<Betalingstermijn[]>([])
   const [toast, setToast] = useState('')
   const router = useRouter()
@@ -50,6 +55,25 @@ export function EigenarenClient({ owners, kavels }: Props) {
     'eerste_termijn','doorgang_fase','bouw_gestart','transport',
     'geplaatst','gereed_oplevering','opgeleverd'
   ]
+
+  async function handleNieuwEigenaar() {
+    if (!nieuwForm.name.trim()) { setNieuwError('Vul een naam in'); return }
+    setSavingNieuw(true); setNieuwError('')
+    try {
+      const res = await fetch('/api/eigenaar/aanmaken', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...nieuwForm, park_id: '11111111-0000-0000-0000-000000000001' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Fout')
+      setOwners(prev => [data.owner, ...prev])
+      setShowNieuw(false)
+      setNieuwForm({ name: '', email: '', phone: '', address: '' })
+    } catch (e: unknown) {
+      setNieuwError(e instanceof Error ? e.message : 'Fout')
+    } finally { setSavingNieuw(false) }
+  }
 
   const ownerBetalingSummary = useMemo(() => {
     const map: Record<string, { current: number; currentNaam: string; currentKey: string }> = {}
@@ -120,6 +144,7 @@ export function EigenarenClient({ owners, kavels }: Props) {
   }
 
   return (
+    <>
     <div className="p-7 max-w-[1280px]">
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[rgba(29,29,31,0.9)] backdrop-blur-xl text-white px-5 py-2.5 rounded-full text-[13px] font-medium z-50">
@@ -137,7 +162,7 @@ export function EigenarenClient({ owners, kavels }: Props) {
             className="px-4 py-1.5 rounded-full text-[13px] font-medium bg-black/[0.06] text-[#3a3a3c] hover:bg-black/10 transition-all">
             ↻ Verversen
           </button>
-          <button className="px-4 py-1.5 rounded-full text-[13px] font-medium bg-[#0071e3] text-white hover:bg-[#0077ed] transition-all">
+          <button onClick={() => setShowNieuw(true)} className="px-4 py-1.5 rounded-full text-[13px] font-medium bg-[#0071e3] text-white hover:bg-[#0077ed] transition-all">
             + Eigenaar
           </button>
         </div>
@@ -371,6 +396,55 @@ export function EigenarenClient({ owners, kavels }: Props) {
         </div>
       </div>
     </div>
+
+      {/* Nieuw eigenaar modal */}
+      {showNieuw && (
+        <>
+          <div className="fixed inset-0 bg-black/[0.3] backdrop-blur-[4px] z-[200]" onClick={() => setShowNieuw(false)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] bg-white rounded-[20px] shadow-[0_12px_40px_rgba(0,0,0,0.15)] w-[460px] p-6">
+            <div className="text-[18px] font-bold mb-1">Nieuwe eigenaar</div>
+            <div className="text-[13px] text-[#6e6e73] mb-5">Voeg een nieuwe eigenaar toe aan dit park.</div>
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Naam *</label>
+                <input value={nieuwForm.name} onChange={e => setNieuwForm(p => ({...p, name: e.target.value}))}
+                  placeholder="Jan de Vries"
+                  className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Email</label>
+                  <input type="email" value={nieuwForm.email} onChange={e => setNieuwForm(p => ({...p, email: e.target.value}))}
+                    placeholder="jan@email.nl"
+                    className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Telefoon</label>
+                  <input value={nieuwForm.phone} onChange={e => setNieuwForm(p => ({...p, phone: e.target.value}))}
+                    placeholder="06-12345678"
+                    className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Adres</label>
+                <input value={nieuwForm.address} onChange={e => setNieuwForm(p => ({...p, address: e.target.value}))}
+                  placeholder="Straat 1, Stad"
+                  className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
+              </div>
+              {nieuwError && <div className="text-[12px] text-[#ff3b30] bg-[rgba(255,59,48,0.08)] rounded-[8px] px-3 py-2">{nieuwError}</div>}
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => { setShowNieuw(false); setNieuwError('') }}
+                className="flex-1 py-2.5 rounded-full bg-black/[0.06] text-[13px] font-medium hover:bg-black/10">Annuleren</button>
+              <button onClick={handleNieuwEigenaar} disabled={savingNieuw}
+                className="flex-1 py-2.5 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] disabled:opacity-50">
+                {savingNieuw ? 'Aanmaken...' : 'Eigenaar aanmaken'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   )
 }
 

@@ -476,6 +476,7 @@ export function InstellingenClient({ park, kavels: initial, allParks = [], vakma
           vakmanCategorieen={vakmanCategorieen}
           optieKoppelingen={optieKoppelingen}
           onOptieKoppelingChange={(key, catId) => setOptieKoppelingen(prev => ({...prev, [key]: catId}))}
+          parkOpties={parkOpties}
         />
 
         {/* Afhankelijkheden */}

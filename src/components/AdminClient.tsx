@@ -72,6 +72,28 @@ interface Profile {
   created_at: string
 }
 
+interface ParkRol {
+  id: string
+  park_id: string
+  rol: string
+  label: string
+  kleur: string
+  rechten: Record<string, boolean>
+}
+
+interface MedewerkerType {
+  id: string
+  park_id: string
+  naam: string
+  rechten: Record<string, boolean>
+}
+
+interface VakmanCategorie {
+  id: string
+  park_id: string
+  naam: string
+}
+
 interface Props {
   organisaties: Organisatie[]
   parks: Park[]
@@ -80,6 +102,9 @@ interface Props {
   pakketten: LicentiePakket[]
   addons: Addon[]
   orgAddons: OrgAddon[]
+  parkRollen: ParkRol[]
+  medewerkerTypes: MedewerkerType[]
+  vakmanCategorieen: VakmanCategorie[]
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -127,7 +152,7 @@ function NumField({ label, value, onChange }: { label: string; value: number; on
   )
 }
 
-export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins, pakketten: initialPakketten, addons: initialAddons, orgAddons: initialOrgAddons }: Props) {
+export function AdminClient({ organisaties: initialOrgs, parks, profiles: initialProfiles, admins, pakketten: initialPakketten, addons: initialAddons, orgAddons: initialOrgAddons, parkRollen: initialParkRollen, medewerkerTypes: initialMedewerkerTypes, vakmanCategorieen }: Props) {
   const [nav, setNav] = useState<'dashboard' | 'klanten' | 'licenties' | 'addons' | 'rechten' | 'gebruikers' | 'instellingen'>('dashboard')
   const [selectedOrg, setSelectedOrg] = useState<Organisatie | null>(null)
   const [organisaties, setOrganisaties] = useState(initialOrgs)
@@ -136,6 +161,15 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
   const [orgAddons, setOrgAddons] = useState(initialOrgAddons)
   const [editAddon, setEditAddon] = useState<Addon | null>(null)
   const [editAddonForm, setEditAddonForm] = useState<Partial<Addon>>({})
+  const [profiles, setProfiles] = useState(initialProfiles)
+  const [parkRollen, setParkRollen] = useState(initialParkRollen)
+  const [medewerkerTypes, setMedewerkerTypes] = useState(initialMedewerkerTypes)
+  const [selectedParkId, setSelectedParkId] = useState(parks[0]?.id ?? '')
+  const [savingRol, setSavingRol] = useState(false)
+  const [showNieuweGebruiker, setShowNieuweGebruiker] = useState(false)
+  const [gebruikerForm, setGebruikerForm] = useState({ naam: '', email: '', wachtwoord: '', role: 'medewerker', subrol: '', vakman_categorie_id: '' })
+  const [savingGebruiker, setSavingGebruiker] = useState(false)
+  const [gebruikerError, setGebruikerError] = useState('')
   const [showNieuw, setShowNieuw] = useState(false)
   const [editOrg, setEditOrg] = useState<Organisatie | null>(null)
   const [editOrgForm, setEditOrgForm] = useState<Partial<Organisatie>>({})
@@ -234,6 +268,47 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Fout')
     }
+  }
+
+  async function saveRolRechten(rolId: string, rechten: Record<string, boolean>) {
+    setSavingRol(true)
+    try {
+      await fetch('/api/admin/update-rol-rechten', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: rolId, rechten }),
+      })
+      setParkRollen(prev => prev.map(r => r.id === rolId ? { ...r, rechten } : r))
+    } catch { alert('Fout bij opslaan') }
+    finally { setSavingRol(false) }
+  }
+
+  async function handleCreateGebruiker() {
+    if (!gebruikerForm.naam || !gebruikerForm.email || !gebruikerForm.wachtwoord) {
+      setGebruikerError('Vul alle verplichte velden in'); return
+    }
+    setSavingGebruiker(true); setGebruikerError('')
+    try {
+      const res = await fetch('/api/create-user', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...gebruikerForm, park_id: selectedParkId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setProfiles(prev => [data.user, ...prev])
+      setShowNieuweGebruiker(false)
+      setGebruikerForm({ naam: '', email: '', wachtwoord: '', role: 'medewerker', subrol: '', vakman_categorie_id: '' })
+    } catch (e: unknown) {
+      setGebruikerError(e instanceof Error ? e.message : 'Fout')
+    } finally { setSavingGebruiker(false) }
+  }
+
+  async function deleteGebruiker(profileId: string) {
+    if (!confirm('Gebruiker verwijderen?')) return
+    await fetch('/api/admin/delete-user', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: profileId }),
+    })
+    setProfiles(prev => prev.filter(p => p.id !== profileId))
   }
 
   function openEditOrg(org: Organisatie) {
@@ -706,63 +781,177 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles, admins
 
         {/* Rechten */}
         {nav === 'rechten' && (
-          <div className="p-8 max-w-[800px]">
-            <div className="mb-6">
-              <h1 className="text-[26px] font-bold tracking-[-0.5px]">Rollen & Rechten</h1>
-              <p className="text-[14px] text-[#6e6e73] mt-0.5">Beheer wat elke rol kan zien en doen per park</p>
+          <div className="p-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-[26px] font-bold tracking-[-0.5px]">Rollen & Rechten</h1>
+                <p className="text-[14px] text-[#6e6e73] mt-0.5">Beheer rechten en gebruikers per park</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <select value={selectedParkId} onChange={e => setSelectedParkId(e.target.value)}
+                  className="bg-white border border-black/[0.1] rounded-[10px] px-3 py-2 text-[13px] outline-none focus:border-[#0071e3]">
+                  {parks.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <button onClick={() => setShowNieuweGebruiker(true)}
+                  className="px-4 py-2 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] flex items-center gap-1.5">
+                  <Plus size={13} /> Gebruiker toevoegen
+                </button>
+              </div>
             </div>
 
-            {[
-              { rol: 'developer', label: 'Ontwikkelaar', kleur: '#0071e3', beschrijving: 'Volledige toegang tot alle functies' },
-              { rol: 'uitvoerder', label: 'Uitvoerder', kleur: '#30d158', beschrijving: 'Kan kavels beheren en fases starten, geen instellingen' },
-              { rol: 'vakman', label: 'Vakman', kleur: '#ff9f0a', beschrijving: 'Eigen mobiele interface met taken en gereed melden' },
-              { rol: 'eigenaar', label: 'Eigenaar (toekomst)', kleur: '#bf5af2', beschrijving: 'Eigen portaal voor woningkopers' },
-            ].map(({ rol, label, kleur, beschrijving }) => {
-              const RECHTEN_LABELS: Record<string, string> = {
-                dashboard: 'Dashboard', eigenaren: 'Eigenaren', werklieden: 'Werklieden',
-                chat: 'Chat', instellingen: 'Instellingen', tessi: 'Tessi AI',
-                kavel_bewerken: 'Kavels bewerken', kavel_verkopen: 'Kavels verkopen',
-                fase_starten: 'Fase starten', taken_inzien: 'Taken inzien',
-                taken_gereedmelden: 'Taken gereed melden', opmerkingen_inzien: 'Opmerkingen inzien',
-                eigen_kavel_inzien: 'Eigen kavel inzien', betalingen_inzien: 'Betalingen inzien',
-              }
-              return (
-                <div key={rol} className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] p-5 mb-4">
-                  <div className="flex items-center gap-3 mb-1">
-                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{background: kleur}} />
-                    <div className="text-[15px] font-bold">{label}</div>
-                    {rol === 'vakman' && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.12)] text-[#a05a00]">
-                        Mobiele app
-                      </span>
-                    )}
+            <div className="grid grid-cols-[1fr_380px] gap-6">
+              <div>
+
+                {/* Interactieve rol cards */}
+                {(() => {
+                  const RECHTEN_LABELS: Record<string, string> = {
+                    dashboard: 'Dashboard', eigenaren: 'Eigenaren', werklieden: 'Werklieden',
+                    chat: 'Chat', instellingen: 'Instellingen', tessi: 'Tessi AI',
+                    kavel_bewerken: 'Kavels bewerken', kavel_verkopen: 'Kavels verkopen',
+                    fase_starten: 'Fase starten', taken_inzien: 'Taken inzien',
+                    taken_gereedmelden: 'Gereed melden', opmerkingen_inzien: 'Opmerkingen',
+                    eigen_kavel_inzien: 'Eigen kavel', betalingen_inzien: 'Betalingen',
+                  }
+                  const parkRollenVoorPark = parkRollen.filter(r => r.park_id === selectedParkId)
+                  return parkRollenVoorPark.map(rol => (
+                    <div key={rol.id} className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] p-5 mb-4">
+                      <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{background: rol.kleur}} />
+                        <div className="text-[15px] font-bold">{rol.label}</div>
+                        {rol.rol === 'vakman' && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.12)] text-[#a05a00]">Mobiele app</span>}
+                        {rol.rol === 'koper' && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(174,174,178,0.2)] text-[#6e6e73]">Binnenkort</span>}
+                        {savingRol && <div className="ml-auto text-[11px] text-[#0071e3]">Opslaan...</div>}
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {Object.entries(RECHTEN_LABELS).map(([key, lbl]) => {
+                          const isOn = rol.rechten?.[key] ?? false
+                          return (
+                            <button key={key}
+                              onClick={() => {
+                                const newRechten = { ...rol.rechten, [key]: !isOn }
+                                saveRolRechten(rol.id, newRechten)
+                              }}
+                              className={"flex items-center gap-2 px-2.5 py-1.5 rounded-[8px] text-[12px] font-medium transition-all text-left " +
+                                (isOn ? 'bg-[rgba(0,113,227,0.08)] text-[#004f9e]' : 'bg-[#f5f5f7] text-[#aeaeb2] hover:bg-[#e8e8ed]')}>
+                              <div className={"w-2 h-2 rounded-full flex-shrink-0 " + (isOn ? 'bg-[#0071e3]' : 'bg-[#d1d1d6]')} />
+                              {lbl}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {rol.rol === 'vakman' && (
+                        <div className="mt-3 p-3 bg-[rgba(255,159,10,0.06)] rounded-[10px] text-[11px] text-[#a05a00]">
+                          Vakmannen worden doorgestuurd naar <strong>/vakman</strong> na inloggen.
+                        </div>
+                      )}
+                    </div>
+                  ))
+                })()}
+              </div>
+
+              {/* Gebruikers sidebar */}
+              <div>
+                <div className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] overflow-hidden">
+                  <div className="px-4 py-3 border-b border-black/[0.05]">
+                    <div className="text-[13px] font-semibold">Gebruikers van {parks.find(p=>p.id===selectedParkId)?.name ?? 'park'}</div>
                   </div>
-                  <div className="text-[12px] text-[#6e6e73] mb-4 ml-6">{beschrijving}</div>
-                  <div className="grid grid-cols-3 gap-2 ml-6">
-                    {Object.entries(RECHTEN_LABELS).map(([key, lbl]) => {
-                      const defaults: Record<string, Record<string, boolean>> = {
-                        developer: { dashboard: true, eigenaren: true, werklieden: true, chat: true, instellingen: true, tessi: true, kavel_bewerken: true, kavel_verkopen: true, fase_starten: true, taken_inzien: true, taken_gereedmelden: true, opmerkingen_inzien: true, eigen_kavel_inzien: true, betalingen_inzien: true },
-                        uitvoerder: { dashboard: true, eigenaren: true, werklieden: true, chat: true, instellingen: false, tessi: true, kavel_bewerken: true, kavel_verkopen: false, fase_starten: true, taken_inzien: true, taken_gereedmelden: false, opmerkingen_inzien: true, eigen_kavel_inzien: false, betalingen_inzien: false },
-                        vakman: { dashboard: false, eigenaren: false, werklieden: false, chat: true, instellingen: false, tessi: false, kavel_bewerken: false, kavel_verkopen: false, fase_starten: false, taken_inzien: true, taken_gereedmelden: true, opmerkingen_inzien: true, eigen_kavel_inzien: false, betalingen_inzien: false },
-                        eigenaar: { dashboard: false, eigenaren: false, werklieden: false, chat: false, instellingen: false, tessi: false, kavel_bewerken: false, kavel_verkopen: false, fase_starten: false, taken_inzien: false, taken_gereedmelden: false, opmerkingen_inzien: false, eigen_kavel_inzien: true, betalingen_inzien: true },
-                      }
-                      const isOn = defaults[rol]?.[key] ?? false
+                  {(() => {
+                    const parkUsers = profiles.filter(p => p.park_id === selectedParkId)
+                    const ROL_KLEUR: Record<string, string> = {
+                      ontwikkelaar: '#0071e3', medewerker: '#30d158', vakman: '#ff9f0a', koper: '#bf5af2'
+                    }
+                    return parkUsers.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-[12px] text-[#aeaeb2]">Geen gebruikers</div>
+                    ) : parkUsers.map((p, i) => {
+                      const name = p.naam ?? p.full_name ?? p.email ?? 'Onbekend'
+                      const catNaam = (p as unknown as Record<string, unknown>).vakman_categorieen as {naam:string}|null
                       return (
-                        <div key={key} className={"flex items-center gap-2 px-2.5 py-1.5 rounded-[8px] text-[12px] " + (isOn ? 'bg-[rgba(0,113,227,0.06)] text-[#004f9e]' : 'bg-[#f5f5f7] text-[#aeaeb2]')}>
-                          <div className={"w-2 h-2 rounded-full flex-shrink-0 " + (isOn ? 'bg-[#0071e3]' : 'bg-[#d1d1d6]')} />
-                          {lbl}
+                        <div key={p.id} className={"flex items-center gap-3 px-4 py-3 " + (i < parkUsers.length-1 ? 'border-b border-black/[0.05]' : '')}>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
+                            style={{background: p.avatar_color ?? ROL_KLEUR[p.role ?? ''] ?? '#6e6e73'}}>
+                            {initials(name)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-medium truncate">{name}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-semibold capitalize" style={{color: ROL_KLEUR[p.role ?? ''] ?? '#6e6e73'}}>{p.role}</span>
+                              {catNaam && <span className="text-[10px] text-[#6e6e73]">· {catNaam.naam}</span>}
+                            </div>
+                          </div>
+                          <button onClick={() => deleteGebruiker(p.id)}
+                            className="w-6 h-6 rounded-full hover:bg-[rgba(255,59,48,0.1)] flex items-center justify-center transition-all text-[#aeaeb2] hover:text-[#ff3b30]">
+                            <X size={12} />
+                          </button>
                         </div>
                       )
-                    })}
-                  </div>
-                  {rol === 'vakman' && (
-                    <div className="mt-4 ml-6 p-3 bg-[rgba(255,159,10,0.06)] rounded-[10px] text-[12px] text-[#a05a00]">
-                      Vakmannen worden doorgestuurd naar <strong>/vakman</strong> na inloggen — een mobiel-vriendelijke interface met hun taken per categorie.
-                    </div>
-                  )}
+                    })
+                  })()}
                 </div>
-              )
-            })}
+              </div>
+            </div>
+
+            {/* Nieuwe gebruiker modal */}
+            {showNieuweGebruiker && (
+              <>
+                <div className="fixed inset-0 bg-black/[0.4] backdrop-blur-[4px] z-[200]" onClick={() => setShowNieuweGebruiker(false)} />
+                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] bg-white rounded-[20px] shadow-[0_12px_40px_rgba(0,0,0,0.2)] w-[480px] p-6">
+                  <div className="text-[18px] font-bold mb-1">Gebruiker toevoegen</div>
+                  <div className="text-[13px] text-[#6e6e73] mb-5">{parks.find(p=>p.id===selectedParkId)?.name}</div>
+                  <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Naam *" value={gebruikerForm.naam} onChange={v => setGebruikerForm(p => ({...p, naam: v}))} />
+                      <Field label="Email *" value={gebruikerForm.email} onChange={v => setGebruikerForm(p => ({...p, email: v}))} />
+                    </div>
+                    <Field label="Wachtwoord *" value={gebruikerForm.wachtwoord} onChange={v => setGebruikerForm(p => ({...p, wachtwoord: v}))} />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Rol</label>
+                        <select value={gebruikerForm.role} onChange={e => setGebruikerForm(p => ({...p, role: e.target.value, subrol: '', vakman_categorie_id: ''}))}
+                          className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] transition-all">
+                          <option value="ontwikkelaar">Ontwikkelaar</option>
+                          <option value="medewerker">Medewerker</option>
+                          <option value="vakman">Vakman</option>
+                          <option value="koper">Koper</option>
+                        </select>
+                      </div>
+                      {gebruikerForm.role === 'medewerker' && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Type medewerker</label>
+                          <select value={gebruikerForm.subrol} onChange={e => setGebruikerForm(p => ({...p, subrol: e.target.value}))}
+                            className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] transition-all">
+                            <option value="">Selecteer type</option>
+                            {medewerkerTypes.filter(t => t.park_id === selectedParkId).map(t => (
+                              <option key={t.id} value={t.naam}>{t.naam}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      {gebruikerForm.role === 'vakman' && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Type vakman</label>
+                          <select value={gebruikerForm.vakman_categorie_id} onChange={e => setGebruikerForm(p => ({...p, vakman_categorie_id: e.target.value}))}
+                            className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#0071e3] transition-all">
+                            <option value="">Selecteer type</option>
+                            {vakmanCategorieen.filter(c => c.park_id === selectedParkId).map(c => (
+                              <option key={c.id} value={c.id}>{c.naam}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                    {gebruikerError && <div className="text-[12px] text-[#ff3b30] bg-[rgba(255,59,48,0.08)] rounded-[8px] px-3 py-2">{gebruikerError}</div>}
+                  </div>
+                  <div className="flex gap-2 mt-5">
+                    <button onClick={() => { setShowNieuweGebruiker(false); setGebruikerError('') }}
+                      className="flex-1 py-2.5 rounded-full bg-black/[0.06] text-[13px] font-medium hover:bg-black/10">Annuleren</button>
+                    <button onClick={handleCreateGebruiker} disabled={savingGebruiker}
+                      className="flex-1 py-2.5 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] disabled:opacity-50">
+                      {savingGebruiker ? 'Aanmaken...' : 'Aanmaken'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 

@@ -8,14 +8,17 @@ export default async function AdminPage() {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  const [orgsRes, parksRes, profilesRes, adminsRes, pakkettenRes, addonsRes, orgAddonsRes] = await Promise.all([
+  const [orgsRes, parksRes, profilesRes, adminsRes, pakkettenRes, addonsRes, orgAddonsRes, parkRollenRes, medewerkerTypesRes, vakmanCatRes] = await Promise.all([
     supabase.from('organisaties').select('*').order('created_at', { ascending: false }),
     supabase.from('parks').select('*').order('created_at', { ascending: false }),
-    supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+    supabase.from('profiles').select('*, vakman_categorieen(naam)').order('created_at', { ascending: false }),
     supabase.from('platform_admins').select('*'),
     supabase.from('licentie_pakketten').select('*').eq('actief', true).order('prijs_per_maand'),
     supabase.from('addons').select('*').eq('actief', true).order('prijs_per_maand'),
     supabase.from('organisatie_addons').select('*'),
+    supabase.from('park_rollen').select('*'),
+    supabase.from('medewerker_types').select('*'),
+    supabase.from('vakman_categorieen').select('*'),
   ])
 
   return (
@@ -27,6 +30,9 @@ export default async function AdminPage() {
       pakketten={pakkettenRes.data ?? []}
       addons={addonsRes.data ?? []}
       orgAddons={orgAddonsRes.data ?? []}
+      parkRollen={parkRollenRes.data ?? []}
+      medewerkerTypes={medewerkerTypesRes.data ?? []}
+      vakmanCategorieen={vakmanCatRes.data ?? []}
     />
   )
 }

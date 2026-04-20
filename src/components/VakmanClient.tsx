@@ -101,20 +101,7 @@ export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) 
           </a>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          {[
-            { label: 'Open', count: openCount, color: '#ff9f0a' },
-            { label: 'Bezig', count: bezigCount, color: '#0071e3' },
-            { label: 'Gereed', count: taken.filter(t=>t.status==='gereed').length, color: '#30d158' },
-            { label: 'Wacht', count: geblokkeerdCount, color: '#aeaeb2' },
-          ].map(({ label, count, color }) => (
-            <div key={label} className="bg-[#f2f2f7] rounded-[12px] px-3 py-2 text-center">
-              <div className="text-[20px] font-bold" style={{color}}>{count}</div>
-              <div className="text-[11px] text-[#6e6e73]">{label}</div>
-            </div>
-          ))}
-        </div>
+
 
         {/* Filter tabs */}
         <div className="flex gap-1 bg-[#f2f2f7] rounded-[10px] p-1">

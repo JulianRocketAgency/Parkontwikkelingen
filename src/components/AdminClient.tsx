@@ -166,8 +166,9 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles: initia
   const [medewerkerTypes, setMedewerkerTypes] = useState(initialMedewerkerTypes)
   const [selectedParkId, setSelectedParkId] = useState(parks[0]?.id ?? '')
   const [savingRol, setSavingRol] = useState(false)
+  const [expandedType, setExpandedType] = useState<string | null>(null)
   const [showNieuweGebruiker, setShowNieuweGebruiker] = useState(false)
-  const [gebruikerForm, setGebruikerForm] = useState({ naam: '', email: '', wachtwoord: '', role: 'medewerker', subrol: '', vakman_categorie_id: '' })
+  const [gebruikerForm, setGebruikerForm] = useState({ voornaam: '', achternaam: '', email: '', wachtwoord: '', role: 'medewerker', subrol: '', vakman_categorie_id: '' })
   const [savingGebruiker, setSavingGebruiker] = useState(false)
   const [gebruikerError, setGebruikerError] = useState('')
   const [showNieuw, setShowNieuw] = useState(false)
@@ -283,20 +284,20 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles: initia
   }
 
   async function handleCreateGebruiker() {
-    if (!gebruikerForm.naam || !gebruikerForm.email || !gebruikerForm.wachtwoord) {
+    if (!gebruikerForm.voornaam || !gebruikerForm.email || !gebruikerForm.wachtwoord) {
       setGebruikerError('Vul alle verplichte velden in'); return
     }
     setSavingGebruiker(true); setGebruikerError('')
     try {
       const res = await fetch('/api/create-user', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...gebruikerForm, park_id: selectedParkId }),
+        body: JSON.stringify({ ...gebruikerForm, naam: [gebruikerForm.voornaam, gebruikerForm.achternaam].filter(Boolean).join(' '), park_id: selectedParkId }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setProfiles(prev => [data.user, ...prev])
       setShowNieuweGebruiker(false)
-      setGebruikerForm({ naam: '', email: '', wachtwoord: '', role: 'medewerker', subrol: '', vakman_categorie_id: '' })
+      setGebruikerForm({ voornaam: '', achternaam: '', email: '', wachtwoord: '', role: 'medewerker', subrol: '', vakman_categorie_id: '' })
     } catch (e: unknown) {
       setGebruikerError(e instanceof Error ? e.message : 'Fout')
     } finally { setSavingGebruiker(false) }
@@ -847,6 +848,93 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles: initia
                     </div>
                   ))
                 })()}
+
+                {/* Medewerker types */}
+                <div className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] p-5 mb-4">
+                  <div className="text-[14px] font-bold mb-1">Medewerker types</div>
+                  <div className="text-[12px] text-[#6e6e73] mb-3">Extra rechten bovenop de basisrol Medewerker</div>
+                  {medewerkerTypes.filter(t => t.park_id === selectedParkId).map(type => {
+                    const MEDEWERKER_RECHTEN: Record<string, string> = {
+                      dashboard: 'Dashboard', eigenaren: 'Eigenaren', chat: 'Chat',
+                      tessi: 'Tessi AI', kavel_bewerken: 'Kavels bewerken',
+                      kavel_verkopen: 'Kavels verkopen', fase_starten: 'Fase starten',
+                      taken_inzien: 'Taken inzien', opmerkingen_inzien: 'Opmerkingen',
+                    }
+                    const isOpen = expandedType === type.id
+                    return (
+                      <div key={type.id} className="mb-2 border border-black/[0.06] rounded-[12px] overflow-hidden">
+                        <button onClick={() => setExpandedType(isOpen ? null : type.id)}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f5f5f7] transition-all text-left">
+                          <div className="w-2 h-2 rounded-full bg-[#30d158] flex-shrink-0" />
+                          <span className="text-[13px] font-semibold flex-1">{type.naam}</span>
+                          <span className="text-[11px] text-[#6e6e73]">
+                            {Object.values(type.rechten).filter(Boolean).length} rechten actief
+                          </span>
+                        </button>
+                        {isOpen && (
+                          <div className="px-4 pb-3 grid grid-cols-2 gap-1.5 border-t border-black/[0.05]" style={{paddingTop: '12px'}}>
+                            {Object.entries(MEDEWERKER_RECHTEN).map(([key, lbl]) => {
+                              const isOn = type.rechten?.[key] ?? false
+                              return (
+                                <button key={key}
+                                  onClick={async () => {
+                                    const newRechten = { ...type.rechten, [key]: !isOn }
+                                    await fetch('/api/admin/update-medewerker-type', {
+                                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ id: type.id, rechten: newRechten }),
+                                    })
+                                    setMedewerkerTypes(prev => prev.map(t => t.id === type.id ? { ...t, rechten: newRechten } : t))
+                                  }}
+                                  className={"flex items-center gap-2 px-2.5 py-1.5 rounded-[8px] text-[12px] font-medium transition-all text-left " +
+                                    (isOn ? 'bg-[rgba(48,209,88,0.08)] text-[#1a7a32]' : 'bg-[#f5f5f7] text-[#aeaeb2] hover:bg-[#e8e8ed]')}>
+                                  <div className={"w-2 h-2 rounded-full flex-shrink-0 " + (isOn ? 'bg-[#30d158]' : 'bg-[#d1d1d6]')} />
+                                  {lbl}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Vakman types */}
+                <div className="bg-white rounded-[16px] border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.07)] p-5">
+                  <div className="text-[14px] font-bold mb-1">Vakman types</div>
+                  <div className="text-[12px] text-[#6e6e73] mb-3">Welke acties elke vakman mag uitvoeren</div>
+                  {vakmanCategorieen.filter(c => c.park_id === selectedParkId).map(cat => {
+                    const VAKMAN_RECHTEN: Record<string, string> = {
+                      taken_inzien: 'Taken inzien',
+                      taken_gereedmelden: 'Gereed melden',
+                      opmerkingen_inzien: 'Opmerkingen inzien',
+                      chat: 'Chat gebruiken',
+                    }
+                    const isOpen = expandedType === ('vak-' + cat.id)
+                    return (
+                      <div key={cat.id} className="mb-2 border border-black/[0.06] rounded-[12px] overflow-hidden">
+                        <button onClick={() => setExpandedType(isOpen ? null : ('vak-' + cat.id))}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f5f5f7] transition-all text-left">
+                          <div className="w-2 h-2 rounded-full bg-[#ff9f0a] flex-shrink-0" />
+                          <span className="text-[13px] font-semibold flex-1">{cat.naam}</span>
+                        </button>
+                        {isOpen && (
+                          <div className="px-4 pb-3 grid grid-cols-2 gap-1.5 border-t border-black/[0.05]" style={{paddingTop: '12px'}}>
+                            {Object.entries(VAKMAN_RECHTEN).map(([key, lbl]) => (
+                              <div key={key} className="flex items-center gap-2 px-2.5 py-1.5 rounded-[8px] text-[12px] bg-[rgba(255,159,10,0.08)] text-[#a05a00]">
+                                <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#ff9f0a]" />
+                                {lbl}
+                              </div>
+                            ))}
+                            <div className="col-span-2 text-[11px] text-[#aeaeb2] mt-1">
+                              Vakman rechten gelden voor alle vakmannen van dit type
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
 
               {/* Gebruikers sidebar */}
@@ -899,10 +987,13 @@ export function AdminClient({ organisaties: initialOrgs, parks, profiles: initia
                   <div className="text-[13px] text-[#6e6e73] mb-5">{parks.find(p=>p.id===selectedParkId)?.name}</div>
                   <div className="flex flex-col gap-3">
                     <div className="grid grid-cols-2 gap-3">
-                      <Field label="Naam *" value={gebruikerForm.naam} onChange={v => setGebruikerForm(p => ({...p, naam: v}))} />
-                      <Field label="Email *" value={gebruikerForm.email} onChange={v => setGebruikerForm(p => ({...p, email: v}))} />
+                      <Field label="Voornaam *" value={gebruikerForm.voornaam} onChange={v => setGebruikerForm(p => ({...p, voornaam: v}))} />
+                      <Field label="Achternaam" value={gebruikerForm.achternaam} onChange={v => setGebruikerForm(p => ({...p, achternaam: v}))} />
                     </div>
-                    <Field label="Wachtwoord *" value={gebruikerForm.wachtwoord} onChange={v => setGebruikerForm(p => ({...p, wachtwoord: v}))} />
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Email *" value={gebruikerForm.email} onChange={v => setGebruikerForm(p => ({...p, email: v}))} />
+                      <Field label="Wachtwoord *" value={gebruikerForm.wachtwoord} onChange={v => setGebruikerForm(p => ({...p, wachtwoord: v}))} />
+                    </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Rol</label>

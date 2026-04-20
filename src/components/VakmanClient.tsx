@@ -204,7 +204,7 @@ export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) 
                       </div>
                     )}
 
-                    {taak.status !== 'gereed' && !taak.geblokkeerd && (
+                    {taak.status !== 'gereed' && (
                       <>
                         <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">
                           Opmerking (optioneel)
@@ -216,22 +216,24 @@ export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) 
                           rows={2}
                           className="w-full bg-[#f2f2f7] rounded-[10px] px-3 py-2.5 text-[13px] outline-none focus:ring-2 focus:ring-[#0071e3] resize-none mb-3"
                         />
-                        <div className="flex gap-2">
-                          {taak.status === 'open' && (
+                        {!taak.geblokkeerd && (
+                          <div className="flex gap-2">
+                            {taak.status === 'open' && (
+                              <button
+                                onClick={() => updateStatus(taak.id, 'in_uitvoering')}
+                                disabled={saving === taak.id}
+                                className="flex-1 py-2.5 rounded-[10px] bg-[rgba(255,159,10,0.12)] text-[#a05a00] text-[13px] font-semibold disabled:opacity-50">
+                                {saving === taak.id ? '...' : 'Starten'}
+                              </button>
+                            )}
                             <button
-                              onClick={() => updateStatus(taak.id, 'in_uitvoering')}
+                              onClick={() => updateStatus(taak.id, 'gereed')}
                               disabled={saving === taak.id}
-                              className="flex-1 py-2.5 rounded-[10px] bg-[rgba(255,159,10,0.12)] text-[#a05a00] text-[13px] font-semibold disabled:opacity-50">
-                              {saving === taak.id ? '...'  : 'Starten'}
+                              className="flex-1 py-2.5 rounded-[10px] bg-[rgba(48,209,88,0.12)] text-[#1a7a32] text-[13px] font-semibold disabled:opacity-50">
+                              {saving === taak.id ? 'Opslaan...' : 'Gereed melden'}
                             </button>
-                          )}
-                          <button
-                            onClick={() => updateStatus(taak.id, 'gereed')}
-                            disabled={saving === taak.id}
-                            className="flex-1 py-2.5 rounded-[10px] bg-[rgba(48,209,88,0.12)] text-[#1a7a32] text-[13px] font-semibold disabled:opacity-50">
-                            {saving === taak.id ? 'Opslaan...' : 'Gereed melden'}
-                          </button>
-                        </div>
+                          </div>
+                        )}
                       </>
                     )}
 

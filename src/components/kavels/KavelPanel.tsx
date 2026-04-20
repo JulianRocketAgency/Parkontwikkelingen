@@ -18,6 +18,7 @@ interface Props {
   onVerkoop: (kavelId: string) => void
   onBetalingTriggered: (b: Betalingstermijn) => void
   vakmanCategorieen?: { id: string; naam: string }[]
+  taken?: { optie_key: string | null; status: string; kavel_id: string; opmerking_vakman: string | null; gestart_op: string | null; gereed_op: string | null }[]
   optieKoppelingen?: Record<string, string>
 }
 
@@ -28,7 +29,7 @@ const TRIGGER_MAP: Record<string, string> = {
   opgeleverd:        'opgeleverd',
 }
 
-export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, onVerkoop, onBetalingTriggered, vakmanCategorieen = [], optieKoppelingen = {} }: Props) {
+export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, onVerkoop, onBetalingTriggered, vakmanCategorieen = [], optieKoppelingen = {}, taken = [] }: Props) {
   const [k, setK] = useState(kavel)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -272,7 +273,18 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                           <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.10)] text-[#a05a00] whitespace-nowrap">{cat.naam}</span>
                         )}
                         {entry.gereed && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.15)] text-[#1a7a32]">Gereed</span>}
-                        {entry.besteld && !entry.gereed && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.12)] text-[#004f9e]">Besteld</span>}
+                        {(() => {
+                          const taak = taken.find(t => t.optie_key === key && t.kavel_id === k.id)
+                          if (!taak || entry.gereed) return null
+                          if (taak.status === 'in_uitvoering') return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.12)] text-[#a05a00]">Gestart</span>
+                          if (taak.status === 'open' && entry.besteld) return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.12)] text-[#004f9e]">Besteld</span>
+                          return null
+                        })()}
+                        {taken.find(t => t.optie_key === key && t.kavel_id === k.id)?.opmerking_vakman && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(191,90,242,0.10)] text-[#7a1fa5] max-w-[120px] truncate">
+                            💬 {taken.find(t => t.optie_key === key && t.kavel_id === k.id)?.opmerking_vakman}
+                          </span>
+                        )}
                         <button onClick={() => setExpandedOptie(isOpen ? null : key)}
                           className="p-1 rounded-lg hover:bg-black/[0.06] transition-all flex-shrink-0">
                           <ChevronDown size={13} className={`text-[#aeaeb2] transition-transform ${isOpen ? 'rotate-180' : ''}`} />

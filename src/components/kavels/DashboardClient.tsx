@@ -20,12 +20,13 @@ interface Props {
   betalingen: Betalingstermijn[]
   vakmanCategorieen?: { id: string; naam: string }[]
   optieKoppelingen?: Record<string, string>
+  taken?: { optie_key: string | null; status: string; kavel_id: string; opmerking_vakman: string | null; gestart_op: string | null; gereed_op: string | null }[]
 }
 
 const PARK_ID = '11111111-0000-0000-0000-000000000001'
 const TERMIJN_VOLGORDE_KEYS = ['eerste_termijn','doorgang_fase','bouw_gestart','transport','geplaatst','gereed_oplevering','opgeleverd']
 
-export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen: initialFaseStatussen, termijnConfig, betalingen: initialBetalingen, vakmanCategorieen = [], optieKoppelingen = {} }: Props) {
+export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen: initialFaseStatussen, termijnConfig, betalingen: initialBetalingen, vakmanCategorieen = [], optieKoppelingen = {}, taken = [] }: Props) {
   const [kavels, setKavels] = useState(initial)
   const [faseStatussen, setFaseStatussen] = useState(initialFaseStatussen)
   const [betalingen, setBetalingen] = useState(initialBetalingen)

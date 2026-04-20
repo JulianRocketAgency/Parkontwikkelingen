@@ -204,7 +204,7 @@ export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) 
                       </div>
                     )}
 
-                    {taak.status !== 'gereed' && (
+                    {taak.status !== 'gereed' && !taak.geblokkeerd && (
                       <>
                         <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">
                           Opmerking (optioneel)

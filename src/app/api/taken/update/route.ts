@@ -9,18 +9,40 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
+
     const updates: Record<string, unknown> = { status }
     if (opmerking_vakman !== undefined) updates.opmerking_vakman = opmerking_vakman
-    if (status === 'gereed') updates.gereed_op = new Date().toISOString()
+    if (status === 'gereed') {
+      updates.gereed_op = new Date().toISOString()
+      // Zet ook _gereed op de kavel_opties als de taak gereed is
+    }
+    if (status === 'in_uitvoering') {
+      updates.gestart_op = new Date().toISOString()
+    }
 
-    const { data, error } = await supabase
+    // Haal optie_key op
+    const { data: taak } = await supabase
+      .from('taken')
+      .select('optie_key, kavel_id')
+      .eq('id', id)
+      .single()
+
+    const { error } = await supabase
       .from('taken')
       .update(updates)
       .eq('id', id)
-      .select().single()
 
     if (error) throw new Error(error.message)
-    return NextResponse.json({ taak: data })
+
+    // Als gereed: zet ook _gereed op kavel_opties
+    if (status === 'gereed' && taak?.optie_key && taak?.kavel_id) {
+      await supabase
+        .from('kavel_opties')
+        .update({ [taak.optie_key + '_gereed']: true })
+        .eq('kavel_id', taak.kavel_id)
+    }
+
+    return NextResponse.json({ ok: true })
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Fout' }, { status: 400 })
   }

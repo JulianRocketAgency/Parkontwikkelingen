@@ -29,8 +29,17 @@ const TRIGGER_MAP: Record<string, string> = {
   opgeleverd:        'opgeleverd',
 }
 
-export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, onVerkoop, onBetalingTriggered, vakmanCategorieen = [], optieKoppelingen = {}, taken = [] }: Props) {
+export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, onVerkoop, onBetalingTriggered, vakmanCategorieen = [], optieKoppelingen = {}, taken: initialTaken = [] }: Props) {
   const [k, setK] = useState(kavel)
+  const [taken, setTaken] = useState(initialTaken)
+
+  // Herlaad taken elke keer als dit kavel geopend wordt
+  useEffect(() => {
+    fetch('/api/taken/voor-kavel?kavel_id=' + kavel.id)
+      .then(r => r.json())
+      .then(data => { if (data.taken) setTaken(data.taken) })
+      .catch(() => {})
+  }, [kavel.id])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [expandedOptie, setExpandedOptie] = useState<string | null>(null)

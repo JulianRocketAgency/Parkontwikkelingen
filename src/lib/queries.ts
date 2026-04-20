@@ -34,12 +34,11 @@ export async function updateKavel(
   id: string,
   updates: Partial<Omit<Kavel, 'id' | 'created_at' | 'owner' | 'status' | 'opties'>>
 ): Promise<void> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('kavels')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', id)
-  if (error) throw error
+  await fetch('/api/kavel/update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, updates }),
+  })
 }
 
 export async function updateKavelPolygon(
@@ -59,15 +58,15 @@ export async function upsertKavelStatus(
   kavelId: string,
   updates: Partial<Omit<KavelStatus, 'id' | 'kavel_id' | 'updated_at'>>
 ): Promise<void> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('kavel_status')
-    .upsert({
-      kavel_id: kavelId,
-      ...updates,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'kavel_id' })
-  if (error) throw error
+  const res = await fetch('/api/kavel/update-status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kavel_id: kavelId, updates }),
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error ?? 'Fout bij opslaan status')
+  }
 }
 
 // ── Opties ────────────────────────────────────────────────────
@@ -75,15 +74,15 @@ export async function upsertKavelOpties(
   kavelId: string,
   updates: Partial<Omit<KavelOpties, 'id' | 'kavel_id' | 'updated_at'>>
 ): Promise<void> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('kavel_opties')
-    .upsert({
-      kavel_id: kavelId,
-      ...updates,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'kavel_id' })
-  if (error) throw error
+  const res = await fetch('/api/kavel/update-opties', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kavel_id: kavelId, updates }),
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error ?? 'Fout bij opslaan opties')
+  }
 }
 
 // ── Owners ────────────────────────────────────────────────────

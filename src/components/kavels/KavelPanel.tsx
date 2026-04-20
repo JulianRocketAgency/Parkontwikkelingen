@@ -310,11 +310,40 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                         </div>
                       )}
                       {isOpen && (
-                        <div className="px-3 pb-3 border-t border-black/[0.05]">
-                          <textarea value={entry.notitie}
-                            onChange={e => setOptieField(key, 'notitie', e.target.value)}
-                            placeholder="Opmerking bij deze optie..." rows={2}
-                            className="w-full mt-2 bg-white border border-black/[0.05] rounded-[8px] px-3 py-2 text-[12px] resize-none outline-none focus:border-[#0071e3] transition-all placeholder:text-[#aeaeb2]" />
+                        <div className="px-3 pb-3 border-t border-black/[0.05] flex flex-col gap-2 mt-2">
+                          <div>
+                            <div className="text-[10px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-1">Interne opmerking</div>
+                            <textarea value={entry.notitie}
+                              onChange={e => setOptieField(key, 'notitie', e.target.value)}
+                              placeholder="Alleen zichtbaar voor het team..." rows={2}
+                              className="w-full bg-white border border-black/[0.05] rounded-[8px] px-3 py-2 text-[12px] resize-none outline-none focus:border-[#0071e3] transition-all placeholder:text-[#aeaeb2]" />
+                          </div>
+                          {(() => {
+                            const taak = taken.find(t => t.optie_key === key && t.kavel_id === k.id)
+                            if (!taak) return null
+                            return (
+                              <div>
+                                <div className="text-[10px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-1">Gedeeld met vakman</div>
+                                <textarea
+                                  defaultValue={taak.opmerking_vakman ?? ''}
+                                  onBlur={async e => {
+                                    await fetch('/api/taken/update', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ id: taak.id, opmerking_vakman: e.target.value }),
+                                    })
+                                  }}
+                                  placeholder="Zichtbaar voor vakman bij zijn taak..." rows={2}
+                                  className="w-full bg-[rgba(0,113,227,0.04)] border border-[rgba(0,113,227,0.15)] rounded-[8px] px-3 py-2 text-[12px] resize-none outline-none focus:border-[#0071e3] transition-all placeholder:text-[#aeaeb2]" />
+                                {taak.status === 'in_uitvoering' && (
+                                  <div className="mt-1 text-[11px] text-[#ff9f0a]">⚡ Vakman is gestart{taak.gestart_op ? ' op ' + new Date(taak.gestart_op).toLocaleDateString('nl-NL') : ''}</div>
+                                )}
+                                {taak.status === 'gereed' && (
+                                  <div className="mt-1 text-[11px] text-[#30d158]">✓ Vakman heeft gereed gemeld{taak.gereed_op ? ' op ' + new Date(taak.gereed_op).toLocaleDateString('nl-NL') : ''}</div>
+                                )}
+                              </div>
+                            )
+                          })()}
                         </div>
                       )}
                     </div>

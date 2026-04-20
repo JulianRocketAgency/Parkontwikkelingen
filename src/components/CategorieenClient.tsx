@@ -100,7 +100,7 @@ export function CategorieenClient({ vakmanCategorieen: initialVC, optieKoppeling
         <div className="text-[15px] font-semibold mb-1">Opties & verantwoordelijke vakman</div>
         <div className="text-[13px] text-[#6e6e73] mb-5">Stel per optie in welk type vakman verantwoordelijk is voor de uitvoering.</div>
 
-        <div className="flex flex-col gap-2 mb-4">
+        <div className="grid grid-cols-2 gap-2 mb-4">
           {parkOpties.map(opt => (
             <div key={opt.id} className="flex items-center gap-3 px-4 py-3 bg-[#f5f5f7] rounded-[12px] border border-black/[0.05]">
               <span className="text-[14px] font-medium flex-1">{opt.label}</span>

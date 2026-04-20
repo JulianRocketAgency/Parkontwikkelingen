@@ -266,7 +266,7 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                     <div key={key}
                       className={`rounded-[12px] border transition-all overflow-hidden
                         ${hasActivity ? 'border-[rgba(0,113,227,0.2)] bg-[rgba(0,113,227,0.04)]' : 'border-black/[0.06] bg-[#f5f5f7]'}`}>
-                      <div className="flex items-center gap-3 px-3 py-2.5">
+                      <div className="flex items-center gap-2 px-3 py-2.5">
                         <button onClick={() => setOptieField(key, 'besteld', !entry.besteld)}
                           className="flex items-center gap-1.5 flex-shrink-0">
                           <Checkbox checked={entry.besteld} color="blue" size="sm" />
@@ -277,23 +277,17 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                           <Checkbox checked={entry.gereed} color="green" size="sm" />
                           <span className="text-[10px] font-medium text-[#6e6e73]">Gereed</span>
                         </button>
-                        <span className={`text-[13px] font-medium flex-1 ${hasActivity ? 'text-[#1d1d1f]' : 'text-[#3a3a3c]'}`}>{label}</span>
+                        <span className={`text-[13px] font-medium flex-1 min-w-0 truncate ${hasActivity ? 'text-[#1d1d1f]' : 'text-[#3a3a3c]'}`}>{label}</span>
                         {cat && (
-                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.10)] text-[#a05a00] whitespace-nowrap">{cat.naam}</span>
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.10)] text-[#a05a00] whitespace-nowrap flex-shrink-0">{cat.naam}</span>
                         )}
-                        {entry.gereed && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.15)] text-[#1a7a32]">Gereed</span>}
                         {(() => {
                           const taak = taken.find(t => t.optie_key === key && t.kavel_id === k.id)
-                          if (!taak || entry.gereed) return null
-                          if (taak.status === 'in_uitvoering') return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.12)] text-[#a05a00]">Gestart</span>
-                          if (taak.status === 'open' && entry.besteld) return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.12)] text-[#004f9e]">Besteld</span>
+                          if (entry.gereed) return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.15)] text-[#1a7a32] flex-shrink-0">Gereed</span>
+                          if (taak?.status === 'in_uitvoering') return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.12)] text-[#a05a00] flex-shrink-0">Gestart</span>
+                          if (entry.besteld) return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.12)] text-[#004f9e] flex-shrink-0">Besteld</span>
                           return null
                         })()}
-                        {taken.find(t => t.optie_key === key && t.kavel_id === k.id)?.opmerking_vakman && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(191,90,242,0.10)] text-[#7a1fa5] max-w-[120px] truncate">
-                            💬 {taken.find(t => t.optie_key === key && t.kavel_id === k.id)?.opmerking_vakman}
-                          </span>
-                        )}
                         <button onClick={() => setExpandedOptie(isOpen ? null : key)}
                           className="p-1 rounded-lg hover:bg-black/[0.06] transition-all flex-shrink-0">
                           <ChevronDown size={13} className={`text-[#aeaeb2] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -319,38 +313,29 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                         </div>
                       )}
                       {isOpen && (
-                        <div className="px-3 pb-3 border-t border-black/[0.05] flex flex-col gap-2 mt-2">
-                          <div>
-                            <div className="text-[10px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-1">Interne opmerking</div>
-                            <textarea value={entry.notitie}
-                              onChange={e => setOptieField(key, 'notitie', e.target.value)}
-                              placeholder="Alleen zichtbaar voor het team..." rows={2}
-                              className="w-full bg-white border border-black/[0.05] rounded-[8px] px-3 py-2 text-[12px] resize-none outline-none focus:border-[#0071e3] transition-all placeholder:text-[#aeaeb2]" />
-                          </div>
+                        <div className="px-3 pb-3 border-t border-black/[0.05] mt-1">
                           {(() => {
                             const taak = taken.find(t => t.optie_key === key && t.kavel_id === k.id)
-                            if (!taak) return null
+                            const notitieWaarde = taak?.opmerking_vakman ?? entry.notitie ?? ''
                             return (
-                              <div>
-                                <div className="text-[10px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-1">Gedeeld met vakman</div>
-                                <textarea
-                                  defaultValue={taak.opmerking_vakman ?? ''}
-                                  onBlur={async e => {
+                              <textarea
+                                key={taak?.id ?? key}
+                                defaultValue={notitieWaarde}
+                                onBlur={async e => {
+                                  const val = e.target.value
+                                  // Sla op in beide velden
+                                  setOptieField(key, 'notitie', val)
+                                  if (taak) {
                                     await fetch('/api/taken/update', {
                                       method: 'POST',
                                       headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ id: taak.id, opmerking_vakman: e.target.value }),
+                                      body: JSON.stringify({ id: taak.id, opmerking_vakman: val }),
                                     })
-                                  }}
-                                  placeholder="Zichtbaar voor vakman bij zijn taak..." rows={2}
-                                  className="w-full bg-[rgba(0,113,227,0.04)] border border-[rgba(0,113,227,0.15)] rounded-[8px] px-3 py-2 text-[12px] resize-none outline-none focus:border-[#0071e3] transition-all placeholder:text-[#aeaeb2]" />
-                                {taak.status === 'in_uitvoering' && (
-                                  <div className="mt-1 text-[11px] text-[#ff9f0a]">⚡ Vakman is gestart{taak.gestart_op ? ' op ' + new Date(taak.gestart_op).toLocaleDateString('nl-NL') : ''}</div>
-                                )}
-                                {taak.status === 'gereed' && (
-                                  <div className="mt-1 text-[11px] text-[#30d158]">✓ Vakman heeft gereed gemeld{taak.gereed_op ? ' op ' + new Date(taak.gereed_op).toLocaleDateString('nl-NL') : ''}</div>
-                                )}
-                              </div>
+                                    setTaken(prev => prev.map(t => t.id === taak.id ? { ...t, opmerking_vakman: val } : t))
+                                  }
+                                }}
+                                placeholder="Notities voor team en vakman..." rows={2}
+                                className="w-full mt-2 bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] resize-none outline-none focus:border-[#0071e3] focus:bg-white transition-all placeholder:text-[#aeaeb2]" />
                             )
                           })()}
                         </div>

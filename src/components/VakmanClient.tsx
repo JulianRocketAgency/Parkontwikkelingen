@@ -206,13 +206,28 @@ export function VakmanClient({ profile, taken: initialTaken, parkNaam }: Props) 
 
                     {taak.status !== 'gereed' && (
                       <>
+                        {taak.opmerking_vakman && (
+                          <div className="flex gap-2 bg-[rgba(0,113,227,0.06)] rounded-[10px] p-3 mb-2">
+                            <MessageSquare size={13} className="text-[#0071e3] flex-shrink-0 mt-0.5" />
+                            <div className="text-[12px] text-[#3a3a3c]">{taak.opmerking_vakman}</div>
+                          </div>
+                        )}
                         <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">
-                          Opmerking (optioneel)
+                          Opmerking toevoegen
                         </label>
                         <textarea
-                          value={opmerking[taak.id] ?? ''}
+                          value={opmerking[taak.id] ?? taak.opmerking_vakman ?? ''}
                           onChange={e => setOpmerking(p => ({...p, [taak.id]: e.target.value}))}
-                          placeholder="Bijv. materialen besteld, wachten op leverancier..."
+                          onBlur={async e => {
+                            if (e.target.value !== (taak.opmerking_vakman ?? '')) {
+                              await fetch('/api/taken/update', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: taak.id, opmerking_vakman: e.target.value }),
+                              })
+                            }
+                          }}
+                          placeholder="Notities zichtbaar voor het hele team..."
                           rows={2}
                           className="w-full bg-[#f2f2f7] rounded-[10px] px-3 py-2.5 text-[13px] outline-none focus:ring-2 focus:ring-[#0071e3] resize-none mb-3"
                         />

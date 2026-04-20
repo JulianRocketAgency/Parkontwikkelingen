@@ -284,7 +284,8 @@ export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen
           onVerkoop={(kavelId) => { setVerkoopModal(kavelId); setVerkoopOwnerId('') }}
           onBetalingTriggered={(b) => setBetalingen(prev => [...prev, b])}
           vakmanCategorieen={vakmanCategorieen}
-          optieKoppelingen={optieKoppelingen} />
+          optieKoppelingen={optieKoppelingen}
+          taken={taken} />
       )}
 
       {verkoopModal && (

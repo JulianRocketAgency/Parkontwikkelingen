@@ -18,6 +18,7 @@ interface Props {
 
 export function CategorieenClient({ vakmanCategorieen: initialVC, optieKoppelingen, onOptieKoppelingChange, parkOpties: initialParkOpties = [] }: Props) {
   const [vakmanCategorieen, setVakmanCategorieen] = useState(initialVC)
+  const [koppelingen, setKoppelingen] = useState<Record<string, string>>(optieKoppelingen)
   const [parkOpties, setParkOpties] = useState(initialParkOpties)
   const [nieuweOptie, setNieuweOptie] = useState('')
   const [savingOptie, setSavingOptie] = useState(false)
@@ -75,114 +76,47 @@ export function CategorieenClient({ vakmanCategorieen: initialVC, optieKoppeling
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[rgba(29,29,31,0.9)] backdrop-blur-xl text-white px-5 py-2.5 rounded-full text-[13px] font-medium z-50">{toast}</div>
       )}
 
-      {/* Optie beheer */}
-      <div className="mb-6">
-        <div className="text-[15px] font-semibold mb-1">Opties beheren</div>
-        <div className="text-[13px] text-[#6e6e73] mb-4">Voeg opties toe of verwijder ze voor dit park.</div>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {parkOpties.map(opt => (
-            <div key={opt.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-[rgba(0,113,227,0.08)] rounded-full">
-              <span className="text-[13px] font-medium text-[#004f9e]">{opt.label}</span>
-              <button onClick={() => verwijderOptie(opt.id)}
-                className="w-4 h-4 rounded-full hover:bg-[rgba(255,59,48,0.15)] flex items-center justify-center transition-all text-[#aeaeb2] hover:text-[#ff3b30]">
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            value={nieuweOptie}
-            onChange={e => setNieuweOptie(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && voegOptieToe()}
-            placeholder="bijv. Jacuzzi, Carport..."
-            className="flex-1 bg-[#f5f5f7] border border-black/[0.06] rounded-full px-4 py-2 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
-          <button onClick={voegOptieToe} disabled={savingOptie || !nieuweOptie.trim()}
-            className="px-4 py-2 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] disabled:opacity-40 transition-all">
-            {savingOptie ? '...' : '+ Toevoegen'}
-          </button>
-        </div>
-      </div>
+      {/* Opties beheren - geïntegreerd */}
+      <div className="text-[15px] font-semibold mb-1">Opties & vakman toewijzing</div>
+      <div className="text-[13px] text-[#6e6e73] mb-5">Beheer opties voor dit park en wijs per optie een verantwoordelijke vakman toe.</div>
 
-      <div className="text-[15px] font-semibold mb-1">Opties & verantwoordelijke vakman</div>
-      <div className="text-[13px] text-[#6e6e73] mb-5">Stel per optie in welk type vakman verantwoordelijk is voor de uitvoering.</div>
-
-      {/* Vakman subcategorieën beheren */}
-      <div className="mb-5">
-        <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-2">Vakman typen</div>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {vakmanCategorieen.map(c => (
-            <div key={c.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-[rgba(255,159,10,0.08)] rounded-full border border-[rgba(255,159,10,0.2)]">
-              <span className="text-[12px] font-medium text-[#a05a00]">{c.naam}</span>
-              <button onClick={() => setDeleteConfirm({ id: c.id, naam: c.naam })}
-                className="text-[rgba(160,90,0,0.4)] hover:text-[#ff3b30] transition-all text-[14px] leading-none ml-0.5">×</button>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input value={newVakmanNaam} onChange={e => setNewVakmanNaam(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            placeholder="bijv. Timmerman, Schilder..."
-            className="flex-1 bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2 text-[13px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
-          <button onClick={handleAdd} disabled={!newVakmanNaam.trim()}
-            className="px-4 py-2 rounded-full bg-[#0071e3] text-white text-[12px] font-medium hover:bg-[#0077ed] disabled:opacity-40 transition-all">
-            + Toevoegen
-          </button>
-        </div>
-      </div>
-
-      {/* Opties toewijzen */}
-      <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-3">Opties toewijzen aan vakman</div>
-      <div className="grid grid-cols-2 gap-2">
-        {[...OPTIES].sort((a,b) => a.label.localeCompare(b.label, 'nl')).map(({ key, label }) => {
-          const selected = vakmanCategorieen.find(c => c.id === optieKoppelingen[key])
-          return (
-            <div key={key} className={`flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 border transition-all
-              ${selected ? 'bg-[rgba(255,159,10,0.06)] border-[rgba(255,159,10,0.2)]' : 'bg-[#f5f5f7] border-black/[0.05]'}`}>
-              <span className="text-[12px] font-medium text-[#3a3a3c] flex-1">{label}</span>
-              <select value={optieKoppelingen[key] ?? ''}
-                onChange={async e => {
-                onOptieKoppelingChange(key, e.target.value)
-                await upsertOptieVakmanKoppeling(PARK_ID, key, e.target.value)
+      <div className="flex flex-col gap-2 mb-4">
+        {parkOpties.map(opt => (
+          <div key={opt.id} className="flex items-center gap-3 px-4 py-3 bg-[#f5f5f7] rounded-[12px] border border-black/[0.05]">
+            <span className="text-[14px] font-medium flex-1">{opt.label}</span>
+            <select
+              value={koppelingen[opt.slug] ?? ''}
+              onChange={async e => {
+                const catId = e.target.value
+                setKoppelingen(prev => ({ ...prev, [opt.slug]: catId }))
+                await upsertOptieVakmanKoppeling('11111111-0000-0000-0000-000000000001', opt.slug, catId)
               }}
-                className="bg-white border border-black/[0.08] rounded-[8px] px-2 py-1 text-[11px] outline-none focus:border-[#0071e3] transition-all text-[#3a3a3c]">
-                <option value="">— Geen —</option>
-                {[...vakmanCategorieen].sort((a,b) => a.naam.localeCompare(b.naam, 'nl')).map(c => <option key={c.id} value={c.id}>{c.naam}</option>)}
-              </select>
-            </div>
-          )
-        })}
+              className="text-[13px] border border-black/[0.1] rounded-full px-3 py-1.5 bg-white outline-none cursor-pointer hover:border-[#0071e3] transition-all min-w-[140px]">
+              <option value="">— Geen vakman —</option>
+              {vakmanCategorieen.map(c => (
+                <option key={c.id} value={c.id}>{c.naam}</option>
+              ))}
+            </select>
+            <button onClick={() => verwijderOptie(opt.id)}
+              className="w-7 h-7 rounded-full hover:bg-[rgba(255,59,48,0.1)] flex items-center justify-center transition-all text-[#aeaeb2] hover:text-[#ff3b30] text-[16px] leading-none">
+              ×
+            </button>
+          </div>
+        ))}
       </div>
 
-      {/* Verwijder bevestiging */}
-      {deleteConfirm && (
-        <>
-          <div className="fixed inset-0 bg-black/[0.22] backdrop-blur-[4px] z-[200]" onClick={() => { setDeleteConfirm(null); setDeleteInput('') }} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] bg-white rounded-[20px] shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-black/[0.05] w-[400px] p-6">
-            <div className="text-[16px] font-bold mb-1 text-[#ff3b30]">Verwijderen bevestigen</div>
-            <div className="text-[13px] text-[#6e6e73] mb-2">Je staat op het punt <strong>{deleteConfirm.naam}</strong> te verwijderen.</div>
-            <div className="bg-[rgba(255,59,48,0.06)] rounded-[10px] p-3 mb-4 text-[12px] text-[#8b1a1a]">
-              ⚠ Dit kan niet meer ongedaan worden gemaakt.
-            </div>
-            <div className="mb-4">
-              <label className="block text-[11px] font-medium text-[#6e6e73] mb-1.5">Typ <strong>verwijderen</strong> om te bevestigen</label>
-              <input value={deleteInput} onChange={e => setDeleteInput(e.target.value)}
-                placeholder="verwijderen"
-                className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[14px] outline-none focus:border-[#ff3b30] transition-all" />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => { setDeleteConfirm(null); setDeleteInput('') }}
-                className="flex-1 py-2.5 rounded-full bg-black/[0.06] text-[#3a3a3c] text-[13px] font-medium hover:bg-black/10">
-                Annuleren
-              </button>
-              <button onClick={handleDelete} disabled={deleteInput !== 'verwijderen'}
-                className="flex-1 py-2.5 rounded-full bg-[#ff3b30] text-white text-[13px] font-medium hover:bg-[#e02e24] disabled:opacity-40 transition-all">
-                Definitief verwijderen
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+      {/* Nieuwe optie toevoegen */}
+      <div className="flex gap-2">
+        <input
+          value={nieuweOptie}
+          onChange={e => setNieuweOptie(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && voegOptieToe()}
+          placeholder="Nieuwe optie toevoegen, bijv. Jacuzzi, Carport..."
+          className="flex-1 bg-[#f5f5f7] border border-black/[0.06] rounded-full px-4 py-2.5 text-[14px] outline-none focus:border-[#0071e3] focus:bg-white transition-all" />
+        <button onClick={voegOptieToe} disabled={savingOptie || !nieuweOptie.trim()}
+          className="px-5 py-2.5 rounded-full bg-[#0071e3] text-white text-[13px] font-medium hover:bg-[#0077ed] disabled:opacity-40 transition-all whitespace-nowrap">
+          {savingOptie ? '...' : '+ Toevoegen'}
+        </button>
+      </div>    </div>
   )
 }

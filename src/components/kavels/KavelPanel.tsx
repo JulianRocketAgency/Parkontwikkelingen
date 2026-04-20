@@ -9,6 +9,24 @@ import {
   type Dependency, type TermijnConfig, type Betalingstermijn
 } from '@/lib/queries'
 
+interface ParkOptie {
+  id: string
+  park_id: string
+  slug: string
+  label: string
+  volgorde: number
+  actief: boolean
+}
+
+interface OptieWaarde {
+  id?: string
+  kavel_id: string
+  optie_id: string
+  gekocht: boolean
+  besteld: boolean
+  gereed: boolean
+  notitie: string | null
+}
 interface Props {
   kavel: Kavel
   termijnConfig: TermijnConfig[]
@@ -18,8 +36,10 @@ interface Props {
   onVerkoop: (kavelId: string) => void
   onBetalingTriggered: (b: Betalingstermijn) => void
   vakmanCategorieen?: { id: string; naam: string }[]
-  taken?: { id: string; optie_key: string | null; status: string; kavel_id: string; opmerking_vakman: string | null; gestart_op: string | null; gereed_op: string | null }[]
+  taken?: { id: string; optie_key: string | null; optie_id?: string | null; status: string; kavel_id: string; opmerking_vakman: string | null; gestart_op: string | null; gereed_op: string | null }[]
   optieKoppelingen?: Record<string, string>
+  parkOpties?: ParkOptie[]
+  optieWaarden?: OptieWaarde[]
 }
 
 const TRIGGER_MAP: Record<string, string> = {
@@ -29,15 +49,20 @@ const TRIGGER_MAP: Record<string, string> = {
   opgeleverd:        'opgeleverd',
 }
 
-export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, onVerkoop, onBetalingTriggered, vakmanCategorieen = [], optieKoppelingen = {}, taken: initialTaken = [] }: Props) {
+export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, onVerkoop, onBetalingTriggered, vakmanCategorieen = [], optieKoppelingen = {}, parkOpties = [], optieWaarden: initialOptieWaarden = [], taken: initialTaken = [] }: Props) {
   const [k, setK] = useState(kavel)
   const [taken, setTaken] = useState(initialTaken)
+  const [optieWaarden, setOptieWaarden] = useState<OptieWaarde[]>(initialOptieWaarden)
 
   // Herlaad taken elke keer als dit kavel geopend wordt
   useEffect(() => {
     fetch('/api/taken/voor-kavel?kavel_id=' + kavel.id)
       .then(r => r.json())
       .then(data => { if (data.taken) setTaken(data.taken) })
+      .catch(() => {})
+    fetch('/api/kavel/optie-waarden?kavel_id=' + kavel.id)
+      .then(r => r.json())
+      .then(data => { if (data.waarden) setOptieWaarden(data.waarden) })
       .catch(() => {})
   }, [kavel.id])
   const [saving, setSaving] = useState(false)
@@ -48,6 +73,28 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { getDependencies(kavel.park_id).then(setDeps) }, [kavel.park_id])
+
+
+  function getWaarde(optieId: string): OptieWaarde {
+    return optieWaarden.find(w => w.optie_id === optieId) ?? {
+      kavel_id: k.id, optie_id: optieId, gekocht: false, besteld: false, gereed: false, notitie: null
+    }
+  }
+
+  async function setWaarde(optieId: string, field: 'gekocht' | 'besteld' | 'gereed' | 'notitie', value: boolean | string) {
+    const huidige = getWaarde(optieId)
+    const nieuw = { ...huidige, [field]: value }
+    setOptieWaarden(prev => {
+      const idx = prev.findIndex(w => w.optie_id === optieId)
+      if (idx >= 0) { const arr = [...prev]; arr[idx] = nieuw; return arr }
+      return [...prev, nieuw]
+    })
+    await fetch('/api/kavel/update-optie-waarde', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kavel_id: k.id, optie_id: optieId, [field]: value }),
+    })
+  }
 
   const pct = getKavelPct(k.status)
 
@@ -106,11 +153,9 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
     update(updated)
   }
 
-  // Opties die gekocht zijn
-  const gekochteOpties = OPTIES.filter(({ key }) => {
-    const opties = k.opties as unknown as Record<string, unknown>
-    return opties?.[key + '_gekocht'] === true
-  })
+  // Dynamische opties: gebruik parkOpties + optieWaarden
+  const gekochteOpties = parkOpties.filter(opt => getWaarde(opt.id).gekocht)
+  const alleOpties = parkOpties
 
   return (
     <>
@@ -203,150 +248,124 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
               <ShoppingBag size={11} />
               <span className="flex-1 text-left">Gekochte opties</span>
               <span className="normal-case text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-black/[0.06]">
-                {gekochteOpties.length}/{OPTIES.length}
+                {gekochteOpties.length}/{alleOpties.length}
               </span>
               <ChevronDown size={11} className={`transition-transform ${gekochteOptiesOpen ? 'rotate-180' : ''}`} />
             </button>
             {gekochteOptiesOpen && (
               <div className="grid grid-cols-2 gap-1">
-                {OPTIES.map(({ key, label }) => {
-                  const opties = k.opties as unknown as Record<string, unknown>
-                  const isGekocht = opties?.[key + '_gekocht'] === true
-                  // Check afhankelijkheden: opties die vereist worden door deze optie
-                  const vereistKeys = deps.filter(d => d.type === 'optie_optie' && d.trigger_key === key).map(d => d.requires_key)
-                  // Check of deze optie vereist wordt door een andere aangevinkte optie
-                  const vereistDoorAangevinkt = deps.filter(d => d.type === 'optie_optie' && d.requires_key === key)
-                    .some(d => (k.opties as unknown as Record<string, unknown>)?.[d.trigger_key + '_gekocht'] === true)
-                  // Waarschuwing: aangevinkt maar vereiste optie niet aangevinkt
-                  const missingVereisten = isGekocht ? vereistKeys.filter(vk => !(k.opties as unknown as Record<string, unknown>)?.[vk + '_gekocht']) : []
+                {alleOpties.map(opt => {
+                  const waarde = getWaarde(opt.id)
                   return (
-                    <div key={key} onClick={() => setOptieField(key, 'gekocht', !isGekocht)}
-                      className={`flex items-center gap-2 px-2.5 py-2 rounded-[10px] cursor-pointer border transition-all
-                        ${isGekocht
-                          ? 'bg-[rgba(48,209,88,0.08)] border-[rgba(48,209,88,0.25)] text-[#1a7a32]'
-                          : vereistDoorAangevinkt
-                            ? 'bg-[rgba(255,59,48,0.06)] border-[rgba(255,59,48,0.2)] text-[#6e6e73]'
-                            : 'bg-[#f5f5f7] border-black/[0.05] text-[#6e6e73] hover:bg-[#e8e8ed]'
-                        }`}>
-                      <Checkbox checked={isGekocht} color="green" size="sm" />
-                      <span className="text-[12px] font-medium flex-1">{label}</span>
-                      {vereistDoorAangevinkt && !isGekocht && (
-                        <span className="w-4 h-4 rounded-full bg-[#ff3b30] flex items-center justify-center text-white font-bold flex-shrink-0" style={{fontSize:9}}>!</span>
-                      )}
-                    </div>
+                    <button key={opt.id}
+                      onClick={() => setWaarde(opt.id, 'gekocht', !waarde.gekocht)}
+                      className={"flex items-center gap-2 px-3 py-2.5 rounded-[12px] border transition-all text-left " +
+                        (waarde.gekocht
+                          ? 'border-[rgba(48,209,88,0.3)] bg-[rgba(48,209,88,0.08)]'
+                          : 'border-black/[0.06] bg-[#f5f5f7] hover:bg-[#ebebeb]')}>
+                      <div className={"w-4 h-4 rounded-[4px] border-2 flex items-center justify-center flex-shrink-0 transition-all " +
+                        (waarde.gekocht ? 'bg-[#30d158] border-[#30d158]' : 'border-[#d1d1d6] bg-white')}>
+                        {waarde.gekocht && <svg width="8" height="6" viewBox="0 0 8 6" fill="none"><path d="M1 3l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      </div>
+                      <span className={"text-[13px] font-medium " + (waarde.gekocht ? 'text-[#1d1d1f]' : 'text-[#6e6e73]')}>{opt.label}</span>
+                    </button>
                   )
                 })}
               </div>
             )}
           </div>
 
-          {/* Bestellingen — alleen gekochte opties */}
-          <div className="mb-6">
-            <div className="text-[11px] font-semibold text-[#aeaeb2] uppercase tracking-[0.07em] mb-2.5 pb-1.5 border-b border-black/[0.05]">
-              Bestellingen
-            </div>
+          <Section title="Bestellingen">
             {gekochteOpties.length === 0 ? (
-              <div className="text-[13px] text-[#aeaeb2] py-3 text-center bg-[#f5f5f7] rounded-[10px]">
-                Geen opties gekocht — vink ze aan bij Gekochte opties
+              <div className="text-[13px] text-[#aeaeb2] py-2">
+                Geen opties gekocht
               </div>
             ) : (
               <div className="flex flex-col gap-1.5">
-                {gekochteOpties.map(({ key, label }) => {
-                  const entry = getOptie(k.opties, key)
-                  const isOpen = expandedOptie === key
-                  const hasActivity = entry.besteld || entry.gereed || entry.notitie
-                  const vereist = deps.filter(d => d.type === 'optie_optie' && d.trigger_key === key)
-                  const vereistDoor = deps.filter(d => d.type === 'optie_optie' && d.requires_key === key)
-                  const geblokkeerd = deps.filter(d => d.type === 'status_optie' && d.requires_key === key)
-                    .filter(d => k.status && !k.status[d.trigger_key as keyof typeof k.status])
-                  const catId = optieKoppelingen[key]
+                {gekochteOpties.map(opt => {
+                  const waarde = getWaarde(opt.id)
+                  const isOpen = expandedOptie === opt.id
+                  const taak = taken.find(t => (t.optie_id === opt.id || t.optie_key === opt.slug) && t.kavel_id === k.id)
+                  const catId = optieKoppelingen[opt.slug]
                   const cat = catId ? vakmanCategorieen.find(c => c.id === catId) : null
-
+                  const deps = [] as {trigger_key: string; requires_key: string; type: string}[]
                   return (
-                    <div key={key}
-                      className={`rounded-[12px] border transition-all overflow-hidden
-                        ${hasActivity ? 'border-[rgba(0,113,227,0.2)] bg-[rgba(0,113,227,0.04)]' : 'border-black/[0.06] bg-[#f5f5f7]'}`}>
+                    <div key={opt.id}
+                      className={"rounded-[12px] border transition-all overflow-hidden " +
+                        (waarde.besteld || waarde.gereed
+                          ? 'border-[rgba(0,113,227,0.2)] bg-[rgba(0,113,227,0.04)]'
+                          : 'border-black/[0.06] bg-[#f5f5f7]')}>
                       <div className="flex items-center gap-2 px-3 py-2.5">
-                        <button onClick={() => setOptieField(key, 'besteld', !entry.besteld)}
+                        <button onClick={() => setWaarde(opt.id, 'besteld', !waarde.besteld)}
                           className="flex items-center gap-1.5 flex-shrink-0">
-                          <Checkbox checked={entry.besteld} color="blue" size="sm" />
+                          <div className={"w-4 h-4 rounded-[4px] border-2 flex items-center justify-center transition-all " +
+                            (waarde.besteld ? 'bg-[#0071e3] border-[#0071e3]' : 'border-[#d1d1d6] bg-white')}>
+                            {waarde.besteld && <svg width="8" height="6" viewBox="0 0 8 6" fill="none"><path d="M1 3l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </div>
                           <span className="text-[10px] font-medium text-[#6e6e73]">Besteld</span>
                         </button>
-                        <button onClick={() => setOptieField(key, 'gereed', !entry.gereed)}
+                        <button onClick={() => setWaarde(opt.id, 'gereed', !waarde.gereed)}
                           className="flex items-center gap-1.5 flex-shrink-0">
-                          <Checkbox checked={entry.gereed} color="green" size="sm" />
+                          <div className={"w-4 h-4 rounded-[4px] border-2 flex items-center justify-center transition-all " +
+                            (waarde.gereed ? 'bg-[#30d158] border-[#30d158]' : 'border-[#d1d1d6] bg-white')}>
+                            {waarde.gereed && <svg width="8" height="6" viewBox="0 0 8 6" fill="none"><path d="M1 3l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </div>
                           <span className="text-[10px] font-medium text-[#6e6e73]">Gereed</span>
                         </button>
-                        <span className={`text-[13px] font-medium flex-1 min-w-0 truncate ${hasActivity ? 'text-[#1d1d1f]' : 'text-[#3a3a3c]'}`}>{label}</span>
+                        <span className={"text-[13px] font-medium flex-1 min-w-0 truncate " +
+                          (waarde.besteld || waarde.gereed ? 'text-[#1d1d1f]' : 'text-[#3a3a3c]')}>{opt.label}</span>
                         {cat && (
                           <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.10)] text-[#a05a00] whitespace-nowrap flex-shrink-0">{cat.naam}</span>
                         )}
-                        {(() => {
-                          const taak = taken.find(t => t.optie_key === key && t.kavel_id === k.id)
-                          if (entry.gereed) return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.15)] text-[#1a7a32] flex-shrink-0">Gereed</span>
-                          if (taak?.status === 'in_uitvoering') return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.12)] text-[#a05a00] flex-shrink-0">Gestart</span>
-                          if (entry.besteld) return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.12)] text-[#004f9e] flex-shrink-0">Besteld</span>
-                          return null
-                        })()}
-                        <button onClick={() => setExpandedOptie(isOpen ? null : key)}
+                        {waarde.gereed
+                          ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.15)] text-[#1a7a32] flex-shrink-0">Gereed</span>
+                          : taak?.status === 'in_uitvoering'
+                          ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.12)] text-[#a05a00] flex-shrink-0">Gestart</span>
+                          : waarde.besteld
+                          ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.12)] text-[#004f9e] flex-shrink-0">Besteld</span>
+                          : null}
+                        <button onClick={() => setExpandedOptie(isOpen ? null : opt.id)}
                           className="p-1 rounded-lg hover:bg-black/[0.06] transition-all flex-shrink-0">
-                          <ChevronDown size={13} className={`text-[#aeaeb2] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                          <ChevronDown size={13} className={"text-[#aeaeb2] transition-transform " + (isOpen ? 'rotate-180' : '')} />
                         </button>
                       </div>
-                      {(geblokkeerd.length > 0 || vereist.length > 0 || vereistDoor.length > 0) && (
-                        <div className="px-3 pb-2 flex flex-wrap gap-1.5">
-                          {geblokkeerd.map(d => (
-                            <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,59,48,0.10)] text-[#8b1a1a]">
-                              Wacht op: {STATUS_LABELS[d.trigger_key] ?? d.trigger_key}
-                            </span>
-                          ))}
-                          {vereist.map(d => (
-                            <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.12)] text-[#a05a00]">
-                              Vereist: {OPTIES.find(o=>o.key===d.requires_key)?.label ?? d.requires_key}
-                            </span>
-                          ))}
-                          {vereistDoor.map(d => (
-                            <span key={d.id} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(0,113,227,0.10)] text-[#004f9e]">
-                              Vereist door: {OPTIES.find(o=>o.key===d.trigger_key)?.label ?? d.trigger_key}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                       {isOpen && (
                         <div className="px-3 pb-3 border-t border-black/[0.05] mt-1 flex flex-col gap-2">
                           <div>
                             <div className="text-[10px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mt-2 mb-1">Interne opmerking</div>
                             <textarea
-                              value={entry.notitie ?? ''}
-                              onChange={e => setOptieField(key, 'notitie', e.target.value)}
+                              value={waarde.notitie ?? ''}
+                              onChange={e => setWaarde(opt.id, 'notitie', e.target.value)}
                               placeholder="Alleen zichtbaar voor het team..."
                               rows={2}
                               className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] resize-none outline-none focus:border-[#0071e3] focus:bg-white transition-all placeholder:text-[#aeaeb2]" />
                           </div>
-                          {(() => {
-                            const taak = taken.find(t => t.optie_key === key && t.kavel_id === k.id)
-                            if (!taak) return null
-                            return (
-                              <div>
-                                <div className="text-[10px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-1">Gedeeld met vakman</div>
-                                <textarea
-                                  key={taak.id}
-                                  defaultValue={taak.opmerking_vakman ?? ''}
-                                  onBlur={async e => {
-                                    const val = e.target.value
-                                    await fetch('/api/taken/update', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ id: taak.id, opmerking_vakman: val }),
-                                    })
-                                    setTaken(prev => prev.map(t => t.id === taak.id ? { ...t, opmerking_vakman: val } : t))
-                                  }}
-                                  placeholder="Zichtbaar voor team én vakman..."
-                                  rows={2}
-                                  className="w-full bg-[rgba(0,113,227,0.04)] border border-[rgba(0,113,227,0.15)] rounded-[10px] px-3 py-2.5 text-[13px] resize-none outline-none focus:border-[#0071e3] transition-all placeholder:text-[#aeaeb2]" />
-                              </div>
-                            )
-                          })()}
+                          {taak && (
+                            <div>
+                              <div className="text-[10px] font-semibold text-[#aeaeb2] uppercase tracking-[0.06em] mb-1">Gedeeld met vakman</div>
+                              <textarea
+                                key={taak.id}
+                                defaultValue={taak.opmerking_vakman ?? ''}
+                                onBlur={async e => {
+                                  const val = e.target.value
+                                  await fetch('/api/taken/update', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: taak.id, opmerking_vakman: val }),
+                                  })
+                                  setTaken(prev => prev.map(t => t.id === taak.id ? { ...t, opmerking_vakman: val } : t))
+                                }}
+                                placeholder="Zichtbaar voor team én vakman..."
+                                rows={2}
+                                className="w-full bg-[rgba(0,113,227,0.04)] border border-[rgba(0,113,227,0.15)] rounded-[10px] px-3 py-2.5 text-[13px] resize-none outline-none focus:border-[#0071e3] transition-all placeholder:text-[#aeaeb2]" />
+                              {taak.status === 'in_uitvoering' && (
+                                <div className="mt-1 text-[11px] text-[#ff9f0a]">⚡ Vakman is gestart{taak.gestart_op ? ' op ' + new Date(taak.gestart_op).toLocaleDateString('nl-NL') : ''}</div>
+                              )}
+                              {taak.status === 'gereed' && (
+                                <div className="mt-1 text-[11px] text-[#30d158]">✓ Gereed gemeld{taak.gereed_op ? ' op ' + new Date(taak.gereed_op).toLocaleDateString('nl-NL') : ''}</div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -354,12 +373,6 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                 })}
               </div>
             )}
-          </div>
-
-          <Section title="Bijzonderheden">
-            <textarea value={k.notitie ?? ''} onChange={e => update({...k, notitie: e.target.value})}
-              placeholder="Notities, bijzonderheden..."
-              className="w-full bg-[#f5f5f7] border border-black/[0.05] rounded-[10px] px-3 py-2.5 text-[13px] resize-y min-h-[70px] outline-none focus:border-[#0071e3] focus:bg-white transition-all placeholder:text-[#aeaeb2]" />
           </Section>
         </div>
 

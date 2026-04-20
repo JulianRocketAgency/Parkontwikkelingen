@@ -20,13 +20,15 @@ interface Props {
   betalingen: Betalingstermijn[]
   vakmanCategorieen?: { id: string; naam: string }[]
   optieKoppelingen?: Record<string, string>
-  taken?: { id: string; optie_key: string | null; status: string; kavel_id: string; opmerking_vakman: string | null; gestart_op: string | null; gereed_op: string | null }[]
+  taken?: { id: string; optie_key: string | null; optie_id?: string | null; status: string; kavel_id: string; opmerking_vakman: string | null; gestart_op: string | null; gereed_op: string | null }[]
+  parkOpties?: { id: string; park_id: string; slug: string; label: string; volgorde: number; actief: boolean }[]
+  optieWaarden?: { id?: string; kavel_id: string; optie_id: string; gekocht: boolean; besteld: boolean; gereed: boolean; notitie: string | null }[]
 }
 
 const PARK_ID = '11111111-0000-0000-0000-000000000001'
 const TERMIJN_VOLGORDE_KEYS = ['eerste_termijn','doorgang_fase','bouw_gestart','transport','geplaatst','gereed_oplevering','opgeleverd']
 
-export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen: initialFaseStatussen, termijnConfig, betalingen: initialBetalingen, vakmanCategorieen = [], optieKoppelingen = {}, taken = [] }: Props) {
+export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen: initialFaseStatussen, termijnConfig, betalingen: initialBetalingen, vakmanCategorieen = [], optieKoppelingen = {}, taken = [], parkOpties = [], optieWaarden = [] }: Props) {
   const [kavels, setKavels] = useState(initial)
   const [faseStatussen, setFaseStatussen] = useState(initialFaseStatussen)
   const [betalingen, setBetalingen] = useState(initialBetalingen)
@@ -285,7 +287,9 @@ export function DashboardClient({ park, kavels: initial, parkMaps, faseStatussen
           onBetalingTriggered={(b) => setBetalingen(prev => [...prev, b])}
           vakmanCategorieen={vakmanCategorieen}
           optieKoppelingen={optieKoppelingen}
-          taken={taken} />
+          taken={taken}
+          parkOpties={parkOpties}
+          optieWaarden={optieWaarden.filter(w => w.kavel_id === selectedKavel?.id)} />
       )}
 
       {verkoopModal && (

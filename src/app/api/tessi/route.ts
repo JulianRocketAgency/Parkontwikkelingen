@@ -35,7 +35,8 @@ async function getParkContext() {
 
   const [k, o, s, ow, bet, prof, fase, tc, deps, vc, vk] = await Promise.all([
     sb.from('kavels').select('*').eq('park_id', PARK_ID),
-    sb.from('kavel_opties').select('*'),
+    sb.from('park_opties').select('*').eq('park_id', PARK_ID).eq('actief', true).order('volgorde'),
+    sb.from('kavel_optie_waarden').select('*'),
     sb.from('kavel_status').select('*'),
     sb.from('owners').select('*').eq('park_id', PARK_ID),
     sb.from('betalingstermijnen').select('*'),

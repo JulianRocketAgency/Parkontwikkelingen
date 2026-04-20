@@ -16,7 +16,7 @@ export default async function DashboardPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
-  const [park, kavels, parkMaps, faseStatussen, termijnConfig, betalingen, vakmanCategorieen, koppelingen, takenRes] = await Promise.all([
+  const [park, kavels, parkMaps, faseStatussen, termijnConfig, betalingen, vakmanCategorieen, koppelingen, takenRes, parkOptiesRes, optieWaardenRes] = await Promise.all([
     getPark(PARK_ID),
     getKavels(PARK_ID),
     getParkMaps(PARK_ID),
@@ -25,7 +25,9 @@ export default async function DashboardPage() {
     getBetalingen(PARK_ID),
     getVakmanCategorieen(PARK_ID),
     getOptieVakmanKoppelingen(PARK_ID),
-    service.from('taken').select('id, optie_key, status, kavel_id, opmerking_vakman, gestart_op, gereed_op').eq('park_id', PARK_ID),
+    service.from('taken').select('id, optie_key, optie_id, status, kavel_id, opmerking_vakman, gestart_op, gereed_op').eq('park_id', PARK_ID),
+    service.from('park_opties').select('*').eq('park_id', PARK_ID).eq('actief', true).order('volgorde'),
+    service.from('kavel_optie_waarden').select('*'),
   ])
 
   return (
@@ -39,6 +41,8 @@ export default async function DashboardPage() {
       vakmanCategorieen={vakmanCategorieen}
       optieKoppelingen={Object.fromEntries(koppelingen.map(k => [k.optie_key, k.vakman_categorie_id]))}
       taken={takenRes.data ?? []}
+      parkOpties={parkOptiesRes.data ?? []}
+      optieWaarden={optieWaardenRes.data ?? []}
     />
   )
 }

@@ -288,7 +288,14 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                   const taak = taken.find(t => (t.optie_id === opt.id || t.optie_key === opt.slug) && t.kavel_id === k.id)
                   const catId = optieKoppelingen[opt.slug]
                   const cat = catId ? vakmanCategorieen.find(c => c.id === catId) : null
-                  const deps = [] as {trigger_key: string; requires_key: string; type: string}[]
+                  // Vereisten voor deze optie (optie_optie dependencies)
+                  const vereisten = deps.filter(d => d.type === 'optie_optie' && d.trigger_key === opt.slug)
+                  // Check welke vereisten nog niet gekocht zijn
+                  const ontbrekendVereisten = vereisten.filter(d => {
+                    const vereistOptie = parkOpties.find(p => p.slug === d.requires_key)
+                    if (!vereistOptie) return false
+                    return !getWaarde(vereistOptie.id).gekocht
+                  })
                   return (
                     <div key={opt.id}
                       className={"rounded-[12px] border transition-all overflow-hidden " +
@@ -316,6 +323,15 @@ export function KavelPanel({ kavel, termijnConfig, owners, onClose, onUpdate, on
                           (waarde.besteld || waarde.gereed ? 'text-[#1d1d1f]' : 'text-[#3a3a3c]')}>{opt.label}</span>
                         {cat && (
                           <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(255,159,10,0.10)] text-[#a05a00] whitespace-nowrap flex-shrink-0">{cat.naam}</span>
+                        )}
+                        {ontbrekendVereisten.length > 0 && (
+                          <span title={"Vereist: " + ontbrekendVereisten.map(d => d.requires_key).join(', ')}
+                            className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[rgba(255,59,48,0.10)] text-[#ff3b30] flex-shrink-0 cursor-help">
+                            ! Vereist: {ontbrekendVereisten.map(d => {
+                              const vOptie = parkOpties.find(p => p.slug === d.requires_key)
+                              return vOptie?.label ?? d.requires_key
+                            }).join(', ')}
+                          </span>
                         )}
                         {waarde.gereed
                           ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(48,209,88,0.15)] text-[#1a7a32] flex-shrink-0">Gereed</span>
